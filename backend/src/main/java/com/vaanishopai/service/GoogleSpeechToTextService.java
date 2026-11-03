@@ -32,10 +32,11 @@ public class GoogleSpeechToTextService {
   }
 
   /**
-   * Transcribe audio bytes. languageOverride (e.g. "hi", "mr", "en") takes
+   * Transcribe audio bytes. {@code extension} must be a whitelisted audio type
+   * (see SpeechController). languageOverride (e.g. "hi", "mr", "en") takes
    * priority over the configured default; pass null to use the default.
    */
-  public String transcribeWebmOpus(byte[] audioBytes, String languageOverride) {
+  public String transcribe(byte[] audioBytes, String extension, String languageOverride) {
     if (props.groq().apiKey() == null || props.groq().apiKey().isBlank()) {
       throw new BadRequestException("GROQ_API_KEY is not set");
     }
@@ -44,7 +45,7 @@ public class GoogleSpeechToTextService {
     }
 
     ByteArrayResource fileResource = new ByteArrayResource(audioBytes) {
-      @Override public String getFilename() { return "audio.webm"; }
+      @Override public String getFilename() { return "audio." + extension; }
     };
 
     MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();
