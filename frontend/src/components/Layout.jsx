@@ -1,144 +1,96 @@
-import React, { useState } from 'react'
-import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import React, { useEffect, useState } from 'react'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
+import { LogOut, Menu, Mic, X } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
+import Logo from './Logo.jsx'
 
-function NavLink({ to, children, onClick }) {
-  const loc = useLocation()
-  const active = loc.pathname === to || loc.pathname.startsWith(to + '/')
-  return (
-    <Link
-      to={to}
-      onClick={onClick}
-      className={[
-        'text-sm font-medium transition-colors',
-        active ? 'text-slate-900' : 'text-slate-500 hover:text-slate-900',
-      ].join(' ')}
-    >
-      {children}
-    </Link>
-  )
-}
-
-function Logo() {
-  return (
-    <Link to="/" className="flex items-center gap-2 group">
-      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white text-sm font-bold group-hover:bg-slate-700 transition-colors">
-        V
-      </span>
-      <span className="font-semibold tracking-tight text-slate-900 hidden sm:block">
-        VaaniShop <span className="text-slate-400 font-normal">AI</span>
-      </span>
-    </Link>
-  )
+function navClass({ isActive }) {
+  return `rounded-xl px-3 py-2 text-[15px] font-semibold transition-colors ${isActive ? 'text-neel' : 'text-neel-500 hover:text-neel'}`
 }
 
 export default function Layout() {
   const { user, isAuthenticated, logoutUser } = useAuth()
   const nav = useNavigate()
-  const [mobileOpen, setMobileOpen] = useState(false)
+  const { pathname } = useLocation()
+  const [menuOpen, setMenuOpen] = useState(false)
+  const onHome = pathname === '/'
+
+  useEffect(() => { setMenuOpen(false) }, [pathname])
 
   function handleLogout() {
     logoutUser()
     toast.success('Signed out')
     nav('/')
-    setMobileOpen(false)
   }
 
   return (
-    <div className="min-h-dvh flex flex-col bg-slate-50">
-      <header className="border-b bg-white sticky top-0 z-20 shadow-sm">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+    <div className="flex min-h-dvh flex-col">
+      <header className={`sticky top-0 z-40 ${onHome ? 'on-haldi bg-haldi' : 'border-b border-neel-100 bg-white/90 backdrop-blur'}`}>
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
           <Logo />
 
-          {/* Desktop nav */}
-          <nav className="hidden sm:flex items-center gap-5">
+          <nav className="hidden items-center gap-1 sm:flex" aria-label="Main">
             {isAuthenticated ? (
               <>
-                <NavLink to="/dashboard">My Shops</NavLink>
-                <Link
-                  to="/create"
-                  className="flex items-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 transition-colors"
-                >
-                  <span>+</span> New Shop
-                </Link>
-                <div className="flex items-center gap-2 pl-3 border-l border-slate-200">
-                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-700">
+                <NavLink to="/dashboard" className={navClass}>My shops</NavLink>
+                <Link to="/create" className="btn-ink btn-sm ml-2"><Mic className="h-4 w-4" aria-hidden="true" /> New shop</Link>
+                <div className="ml-3 flex items-center gap-2 border-l border-neel-100 pl-3">
+                  <span className="grid h-9 w-9 place-items-center rounded-full bg-neel-100 font-bold text-neel" aria-hidden="true">
                     {user?.name?.[0]?.toUpperCase() || 'U'}
-                  </div>
-                  <span className="text-xs text-slate-500 max-w-[100px] truncate">{user?.name}</span>
-                  <button
-                    onClick={handleLogout}
-                    className="text-xs font-medium text-slate-400 hover:text-slate-800 transition-colors"
-                  >
-                    Sign out
+                  </span>
+                  <span className="max-w-[9rem] truncate text-sm font-medium text-neel-700">{user?.name}</span>
+                  <button onClick={handleLogout} className="grid h-9 w-9 place-items-center rounded-xl text-neel-500 hover:bg-neel-100 hover:text-neel" aria-label="Sign out" title="Sign out">
+                    <LogOut className="h-4 w-4" />
                   </button>
                 </div>
               </>
             ) : (
               <>
-                <NavLink to="/login">Sign in</NavLink>
-                <Link
-                  to="/register"
-                  className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 transition-colors"
-                >
-                  Get started free
-                </Link>
+                <NavLink to="/login" className={navClass}>Sign in</NavLink>
+                <Link to="/create" className="btn-ink btn-sm ml-2"><Mic className="h-4 w-4" aria-hidden="true" /> Make my shop page</Link>
               </>
             )}
           </nav>
 
-          {/* Mobile hamburger */}
           <button
-            className="sm:hidden p-2 rounded-lg hover:bg-slate-100"
-            onClick={() => setMobileOpen(o => !o)}
-            aria-label="Toggle menu"
+            className="grid h-11 w-11 place-items-center rounded-xl text-neel hover:bg-neel/5 sm:hidden"
+            onClick={() => setMenuOpen(o => !o)}
+            aria-expanded={menuOpen}
+            aria-controls="mobile-menu"
+            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
           >
-            <span className="block w-5 h-0.5 bg-slate-700 mb-1"></span>
-            <span className="block w-5 h-0.5 bg-slate-700 mb-1"></span>
-            <span className="block w-5 h-0.5 bg-slate-700"></span>
+            {menuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
         </div>
 
-        {/* Mobile menu */}
-        {mobileOpen && (
-          <div className="sm:hidden border-t bg-white px-4 py-3 flex flex-col gap-3">
+        {menuOpen && (
+          <nav id="mobile-menu" aria-label="Main" className="grid gap-1 border-t border-neel-100 bg-white px-4 pb-4 pt-2 sm:hidden">
             {isAuthenticated ? (
               <>
-                <NavLink to="/dashboard" onClick={() => setMobileOpen(false)}>My Shops</NavLink>
-                <NavLink to="/create" onClick={() => setMobileOpen(false)}>+ New Shop</NavLink>
-                <div className="pt-2 border-t flex items-center justify-between">
-                  <span className="text-xs text-slate-500">{user?.name}</span>
-                  <button onClick={handleLogout} className="text-xs font-medium text-slate-500">Sign out</button>
-                </div>
+                <p className="px-3 py-2 text-sm text-neel-500">Signed in as <span className="font-semibold text-neel">{user?.name}</span></p>
+                <NavLink to="/dashboard" className={navClass}>My shops</NavLink>
+                <Link to="/create" className="btn-ink mt-1"><Mic className="h-4 w-4" aria-hidden="true" /> New shop</Link>
+                <button onClick={handleLogout} className="btn-ghost justify-start"><LogOut className="h-4 w-4" aria-hidden="true" /> Sign out</button>
               </>
             ) : (
               <>
-                <NavLink to="/login" onClick={() => setMobileOpen(false)}>Sign in</NavLink>
-                <Link
-                  to="/register"
-                  onClick={() => setMobileOpen(false)}
-                  className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white text-center"
-                >
-                  Get started free
-                </Link>
+                <Link to="/create" className="btn-ink"><Mic className="h-4 w-4" aria-hidden="true" /> Make my shop page</Link>
+                <NavLink to="/login" className={navClass}>Sign in</NavLink>
               </>
             )}
-          </div>
+          </nav>
         )}
       </header>
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">
+      <main className="flex-1">
         <Outlet />
       </main>
 
-      <footer className="border-t bg-white mt-auto">
-        <div className="mx-auto max-w-6xl px-4 py-5 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-400">
-          <div className="flex items-center gap-2">
-            <span className="flex h-5 w-5 items-center justify-center rounded bg-slate-900 text-white text-xs font-bold">V</span>
-            <span>VaaniShop AI</span>
-          </div>
-          <span>Voice-driven shop websites for every shopkeeper · Built with ♥ for India</span>
+      <footer className="border-t border-neel-100 bg-white">
+        <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-8 text-sm text-neel-500 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <Logo />
+          <p>Shop websites made by voice, for every bazaar in India.</p>
         </div>
       </footer>
     </div>

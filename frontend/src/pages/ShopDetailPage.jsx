@@ -1,344 +1,176 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import { Link, useParams } from 'react-router-dom'
-import VoiceRecorder from '../components/VoiceRecorder.jsx'
+import {
+  ArrowLeft, Camera, Check, Copy, ExternalLink, ImagePlus, Loader2, MessageCircle, Plus, Send, Sparkles, Trash2, Wand2, X,
+} from 'lucide-react'
+import PhoneFrame from '../components/PhoneFrame.jsx'
+import QrCard from '../components/QrCard.jsx'
+import ShopSite from '../components/ShopSite.jsx'
 import Spinner from '../components/Spinner.jsx'
-import { getOwnedShop, transcribeAudio, updateShopFromText, updateShopFields } from '../lib/api.js'
+import ThemePicker from '../components/ThemePicker.jsx'
+import VoiceCapture from '../components/VoiceCapture.jsx'
+import {
+  getOwnedShop, imageUrl, transcribeAudio, updateShopFields, updateShopFromText, uploadShopImage,
+} from '../lib/api.js'
+import { resizeImage } from '../lib/image.js'
+import { categoryEmoji, shopPath, shopUrl, shareText, whatsappShareLink } from '../lib/shop.js'
 
-function Field({ label, value, onChange, type = 'text', placeholder = '' }) {
-  return (
-    <div>
-      <label className="block text-xs font-medium text-slate-600 mb-1">{label}</label>
-      <input
-        type={type}
-        value={value || ''}
-        onChange={e => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
-      />
-    </div>
-  )
-}
+const TABS = [
+  { key: 'details', label: 'Details' },
+  { key: 'items', label: 'Items' },
+  { key: 'look', label: 'Look' },
+  { key: 'share', label: 'Share' },
+  { key: 'preview', label: 'Preview', mobileOnly: true },
+]
 
-function TextArea({ label, value, onChange, placeholder = '' }) {
-  return (
-    <div>
-      <label className="block text-xs font-medium text-slate-600 mb-1">{label}</label>
-      <textarea
-        value={value || ''}
-        onChange={e => onChange(e.target.value)}
-        placeholder={placeholder}
-        rows={3}
-        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none bg-white"
-      />
-    </div>
-  )
-}
-
-const THEMES = ['slate', 'green', 'orange', 'blue', 'purple', 'rose']
-const THEME_DOT = {
-  slate: 'bg-slate-700', green: 'bg-green-600', orange: 'bg-orange-500',
-  blue: 'bg-blue-600', purple: 'bg-purple-600', rose: 'bg-rose-500',
-}
+const EMPTY_PRODUCT = { name: '', price: '', description: '', category: '', emoji: '', image: '', suggested: false }
 
 export default function ShopDetailPage() {
   const { id } = useParams()
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [updating, setUpdating] = useState(false)
   const [shop, setShop] = useState(null)
-  const [editMode, setEditMode] = useState(false)
   const [form, setForm] = useState(null)
+  const [loadError, setLoadError] = useState(null)
+  const [tab, setTab] = useState('details')
+  const [saving, setSaving] = useState(false)
+  const [lastChange, setLastChange] = useState('')
 
-  async function load() {
-    setLoading(true)
-    try {
-      const res = await getOwnedShop(id)
-      setShop(res)
-      setForm({ ...res.data, products: res.data.products || [] })
-    } catch (e) {
-      toast.error(e.message || 'Failed to load shop')
-    } finally {
-      setLoading(false)
-    }
+  const dirty = !!shop && !!form && JSON.stringify(form) !== JSON.stringify(shop.data)
+
+  useEffect(() => {
+    getOwnedShop(id)
+      .then(res => { setShop(res); setForm(res.data) })
+      .catch(e => setLoadError(e))
+  }, [id])
+
+  useEffect(() => {
+    if (!dirty) return undefined
+    const warn = e => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [dirty])
+
+  function set(patch) {
+    setForm(prev => ({ ...prev, ...patch }))
   }
 
-  useEffect(() => { load() }, [id])
-
-  function setField(key, val) { setForm(prev => ({ ...prev, [key]: val })) }
-
-  function setProductField(idx, key, val) {
-    setForm(prev => {
-      const products = [...(prev.products || [])]
-      products[idx] = { ...products[idx], [key]: val }
-      return { ...prev, products }
-    })
-  }
-
-  function addProduct() {
-    setForm(prev => ({
-      ...prev,
-      products: [...(prev.products || []), { name: '', price: '', description: '', category: '' }],
-    }))
-  }
-
-  function removeProduct(idx) {
-    setForm(prev => {
-      const products = [...(prev.products || [])]
-      products.splice(idx, 1)
-      return { ...prev, products }
-    })
-  }
-
-  async function handleSave() {
+  async function save(next = form, { quiet = false } = {}) {
     setSaving(true)
     try {
-      const res = await updateShopFields(id, form)
+      const res = await updateShopFields(id, next)
       setShop(res)
-      setForm({ ...res.data, products: res.data.products || [] })
-      setEditMode(false)
-      toast.success('Shop saved')
+      setForm(res.data)
+      if (!quiet) toast.success('Saved. Your page is updated.')
+      return res
     } catch (e) {
-      toast.error(e.message || 'Failed to save')
+      toast.error(e.message || 'Could not save. Try again.')
+      return null
     } finally {
       setSaving(false)
     }
   }
 
-  async function handleVoiceUpdate(blob, language) {
-    setUpdating(true)
+  /** Applies a spoken or typed change. Unsaved edits are saved first so the AI sees them. */
+  async function applyChange(instruction) {
+    if (dirty && !(await save(form, { quiet: true }))) return false
     try {
-      const { text } = await transcribeAudio(blob, language)
-      if (!text?.trim()) { toast.error('No speech detected'); return }
-      const res = await updateShopFromText(id, text)
+      const res = await updateShopFromText(id, instruction)
       setShop(res)
-      setForm({ ...res.data, products: res.data.products || [] })
-      toast.success('Shop updated by voice')
+      setForm(res.data)
+      setLastChange(res.changeSummary || 'Your page is updated')
+      toast.success(res.changeSummary || 'Updated')
+      return true
     } catch (e) {
-      toast.error(e.message || 'Failed to update')
-    } finally {
-      setUpdating(false)
+      toast.error(e.message || 'Could not make that change. Try saying it another way.')
+      return false
     }
   }
 
-  if (loading) return <Spinner label="Loading shop…" />
-  if (!shop) return (
-    <div className="rounded-2xl border bg-white p-8 shadow-sm">
-      <p className="text-sm text-slate-600">Shop not found or access denied.</p>
-      <Link to="/dashboard" className="text-sm underline mt-2 block text-blue-600">Back to dashboard</Link>
-    </div>
-  )
+  if (loadError) {
+    return (
+      <div className="mx-auto max-w-lg px-4 py-24 text-center">
+        <h1 className="text-3xl font-bold condensed">{loadError.status === 403 ? 'This shop belongs to another account' : 'Couldn’t open this shop'}</h1>
+        <p className="mt-2 text-neel-500">{loadError.message}</p>
+        <Link to="/dashboard" className="btn-ink mt-6">Back to my shops</Link>
+      </div>
+    )
+  }
+  if (!shop || !form) return <Spinner label="Opening your shop…" />
 
-  const publicUrl = `/shop/${id}`
-  const fullPublicUrl = `${window.location.origin}${publicUrl}`
+  const url = shopUrl(shop)
 
   return (
-    <div className="grid gap-6">
-      {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <Link to="/dashboard" className="text-xs text-slate-500 hover:text-slate-800 flex items-center gap-1 mb-2">
-            ← My Shops
-          </Link>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">{shop.data.shopName}</h1>
-          <div className="flex items-center gap-3 mt-1">
-            {shop.data.category && (
-              <span className="text-xs text-slate-500 capitalize bg-slate-100 rounded-full px-2.5 py-0.5">
-                {shop.data.category}
-              </span>
-            )}
-            {shop.viewCount > 0 && (
-              <span className="text-xs text-slate-400">👁 {shop.viewCount} views</span>
-            )}
-            {shop.slug && (
-              <span className="text-xs text-slate-400 font-mono">/shop/{shop.slug}</span>
-            )}
-          </div>
+    <div className="mx-auto max-w-6xl px-4 pb-32 pt-6 sm:px-6">
+      <Link to="/dashboard" className="btn-ghost btn-sm -ml-3"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> My shops</Link>
+
+      <header className="mt-2 flex flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="sign break-words text-[clamp(2.2rem,5vw,3.4rem)] text-neel-900">{shop.data.shopName}</h1>
+          <p className="mt-1 text-neel-500">{shop.viewCount} {shop.viewCount === 1 ? 'visit' : 'visits'} so far</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link
-            to={publicUrl}
-            target="_blank"
-            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium hover:bg-slate-50 transition-colors"
-          >
-            View Public Page
-          </Link>
-          {editMode ? (
-            <>
-              <button
-                onClick={() => { setEditMode(false); setForm({ ...shop.data, products: shop.data.products || [] }) }}
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium hover:bg-slate-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50 transition-colors"
-              >
-                {saving ? 'Saving…' : 'Save Changes'}
-              </button>
-            </>
-          ) : (
-            <button
-              onClick={() => setEditMode(true)}
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 transition-colors"
-            >
-              Edit Details
-            </button>
-          )}
+          <button type="button" onClick={() => { navigator.clipboard?.writeText(url); toast.success('Link copied') }} className="btn-line btn-sm">
+            <Copy className="h-4 w-4" aria-hidden="true" /> Copy link
+          </button>
+          <a href={shopPath(shop)} target="_blank" rel="noreferrer" className="btn-line btn-sm">
+            <ExternalLink className="h-4 w-4" aria-hidden="true" /> Open page
+          </a>
         </div>
-      </div>
+      </header>
 
-      {editMode ? (
-        <div className="grid gap-6">
-          {/* Shop details form */}
-          <div className="rounded-2xl border bg-white p-6 shadow-sm grid gap-5">
-            <h2 className="text-sm font-semibold text-slate-900">Shop Details</h2>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Shop Name" value={form.shopName} onChange={v => setField('shopName', v)} placeholder="Ramesh General Store" />
-              <Field label="Category" value={form.category} onChange={v => setField('category', v)} placeholder="grocery, bakery, electronics…" />
-            </div>
-            <TextArea label="Description" value={form.description} onChange={v => setField('description', v)} placeholder="What you sell or offer…" />
-            <Field label="Address" value={form.address} onChange={v => setField('address', v)} placeholder="Shop no. 5, Main Bazaar, Pune" />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Phone" value={form.phone} onChange={v => setField('phone', v)} placeholder="9876543210" type="tel" />
-              <Field label="WhatsApp" value={form.whatsapp} onChange={v => setField('whatsapp', v)} placeholder="9876543210" type="tel" />
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Email" value={form.email} onChange={v => setField('email', v)} placeholder="shop@example.com" type="email" />
-              <Field label="Instagram" value={form.instagram} onChange={v => setField('instagram', v)} placeholder="@myshop" />
-            </div>
-            <Field label="Business Hours" value={form.timing} onChange={v => setField('timing', v)} placeholder="9am–9pm Mon–Sat" />
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-2">Theme Color</label>
-              <div className="flex gap-2 flex-wrap">
-                {THEMES.map(th => (
-                  <button
-                    key={th}
-                    onClick={() => setField('theme', th)}
-                    className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium border capitalize transition-colors ${
-                      form.theme === th ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 hover:border-slate-400'
-                    }`}
-                  >
-                    <span className={`h-2.5 w-2.5 rounded-full ${THEME_DOT[th]}`} />
-                    {th}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
+      <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="min-w-0">
+          <VoiceEdit onApply={applyChange} lastChange={lastChange} busy={saving} />
 
-          {/* Products form */}
-          <div className="rounded-2xl border bg-white p-6 shadow-sm grid gap-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-slate-900">Products / Services</h2>
+          <div role="tablist" aria-label="Edit sections" className="-mx-4 mt-8 flex gap-1 overflow-x-auto border-b border-neel-100 px-4 scrollbar-none sm:mx-0 sm:px-0">
+            {TABS.map(t => (
               <button
-                onClick={addProduct}
-                className="text-xs font-medium text-slate-700 border border-slate-200 rounded-lg px-3 py-1.5 hover:bg-slate-50 transition-colors"
+                key={t.key}
+                role="tab"
+                id={`tab-${t.key}`}
+                aria-selected={tab === t.key}
+                aria-controls={`panel-${t.key}`}
+                onClick={() => setTab(t.key)}
+                className={`-mb-px shrink-0 border-b-[3px] px-4 py-3 font-semibold transition-colors ${t.mobileOnly ? 'lg:hidden' : ''} ${tab === t.key ? 'border-sindoor text-neel-900' : 'border-transparent text-neel-500 hover:text-neel'}`}
               >
-                + Add Product
+                {t.label}{t.key === 'items' ? ` (${form.products.length})` : ''}
               </button>
-            </div>
-            {form.products?.length === 0 && (
-              <p className="text-sm text-slate-400">No products yet. Add one above.</p>
-            )}
-            {form.products?.map((p, idx) => (
-              <div key={idx} className="rounded-xl border border-slate-100 bg-slate-50 p-4 grid gap-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-slate-500">Product {idx + 1}</span>
-                  <button onClick={() => removeProduct(idx)} className="text-xs text-rose-500 hover:underline">Remove</button>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Field label="Name" value={p.name} onChange={v => setProductField(idx, 'name', v)} placeholder="Product name" />
-                  <Field label="Price" value={p.price} onChange={v => setProductField(idx, 'price', v)} placeholder="₹50" />
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Field label="Category" value={p.category} onChange={v => setProductField(idx, 'category', v)} placeholder="e.g. vegetables" />
-                  <Field label="Description" value={p.description} onChange={v => setProductField(idx, 'description', v)} placeholder="Short description" />
-                </div>
-              </div>
             ))}
           </div>
-        </div>
-      ) : (
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* Main content */}
-          <div className="lg:col-span-2 grid gap-5">
-            <div className="rounded-2xl border bg-white p-6 shadow-sm">
-              <h2 className="text-sm font-semibold text-slate-900 mb-4">Shop Info</h2>
-              <div className="grid gap-3">
-                <InfoRow label="Description" value={shop.data.description} />
-                <InfoRow label="Address" value={shop.data.address} />
-                <InfoRow label="Phone" value={shop.data.phone} />
-                <InfoRow label="WhatsApp" value={shop.data.whatsapp} />
-                <InfoRow label="Email" value={shop.data.email} />
-                <InfoRow label="Instagram" value={shop.data.instagram} />
-                <InfoRow label="Hours" value={shop.data.timing} />
-                <InfoRow label="Theme" value={shop.data.theme} />
-              </div>
-            </div>
 
-            <div className="rounded-2xl border bg-white p-6 shadow-sm">
-              <h2 className="text-sm font-semibold text-slate-900 mb-4">
-                Products <span className="text-slate-400 font-normal">({shop.data.products?.length || 0})</span>
-              </h2>
-              {shop.data.products?.length ? (
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {shop.data.products.map((p, idx) => (
-                    <div key={idx} className="rounded-xl border bg-slate-50 p-3.5">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <span className="font-medium text-sm text-slate-900">{p.name || '—'}</span>
-                        {p.price && <span className="text-xs font-semibold text-slate-600 shrink-0">{p.price}</span>}
-                      </div>
-                      {p.description && <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{p.description}</p>}
-                      {p.category && <span className="mt-1.5 inline-block text-xs text-slate-400 capitalize">{p.category}</span>}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-slate-400">No products listed. Click "Edit Details" to add some.</p>
-              )}
-            </div>
+          <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} className="pt-6">
+            {tab === 'details' && <DetailsTab form={form} set={set} />}
+            {tab === 'items' && <ItemsTab form={form} set={set} shopId={id} onPhotoSaved={next => save(next, { quiet: true })} />}
+            {tab === 'look' && <LookTab form={form} set={set} shopId={id} onPhotoSaved={next => save(next, { quiet: true })} />}
+            {tab === 'share' && <ShareTab shop={shop} url={url} />}
+            {tab === 'preview' && (
+              <PhoneFrame responsive>
+                <ShopSite data={form} url={url} />
+              </PhoneFrame>
+            )}
           </div>
+        </div>
 
-          {/* Sidebar */}
-          <div className="grid gap-4 content-start">
-            {/* Voice update */}
-            <div className="rounded-2xl border bg-white p-5 shadow-sm">
-              <h2 className="text-sm font-semibold text-slate-900 mb-1">Update by Voice</h2>
-              <p className="text-xs text-slate-400 mb-4 leading-relaxed">
-                Say something like "Change timing to 10am–8pm" or "Add mango juice for ₹30" or "Update address to MG Road".
-              </p>
-              <VoiceRecorder disabled={updating} onAudioReady={handleVoiceUpdate} showLanguage={true} />
-              {updating && (
-                <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
-                  <Spinner /> Updating your shop…
-                </div>
-              )}
-            </div>
+        <aside className="hidden lg:block" aria-label="Live preview">
+          <div className="sticky top-24">
+            <PhoneFrame responsive>
+              <ShopSite data={form} url={url} />
+            </PhoneFrame>
+            <p className="mt-3 text-center text-sm text-neel-500">{dirty ? 'Preview of your unsaved changes' : 'What customers see right now'}</p>
+          </div>
+        </aside>
+      </div>
 
-            {/* Public link */}
-            <div className="rounded-2xl border bg-white p-5 shadow-sm">
-              <h2 className="text-sm font-semibold text-slate-900 mb-3">Public Link</h2>
-              <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs font-mono text-slate-600 break-all mb-2">
-                {fullPublicUrl}
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <Link
-                  to={publicUrl}
-                  target="_blank"
-                  className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-center hover:bg-slate-50 transition-colors"
-                >
-                  Open Page
-                </Link>
-                <button
-                  onClick={() => { navigator.clipboard.writeText(fullPublicUrl); toast.success('Link copied!') }}
-                  className="rounded-lg bg-slate-900 text-white px-3 py-2 text-xs font-medium hover:bg-slate-700 transition-colors"
-                >
-                  Copy Link
-                </button>
-              </div>
+      {dirty && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-neel-100 bg-white/95 backdrop-blur">
+          <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 pb-safe pt-3 sm:px-6">
+            <p className="font-medium text-neel-700">You have unsaved changes</p>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setForm(shop.data)} className="btn-ghost btn-sm">Discard</button>
+              <button type="button" onClick={() => save()} disabled={saving} className="btn-ink btn-sm px-5">
+                {saving ? <Loader2 className="h-4 w-4 spin-slow" aria-hidden="true" /> : <Check className="h-4 w-4" aria-hidden="true" />}
+                Save changes
+              </button>
             </div>
           </div>
         </div>
@@ -347,12 +179,248 @@ export default function ShopDetailPage() {
   )
 }
 
-function InfoRow({ label, value }) {
-  if (!value) return null
+function VoiceEdit({ onApply, lastChange, busy }) {
+  const [text, setText] = useState('')
+  const [working, setWorking] = useState(false)
+
+  async function run(instruction) {
+    setWorking(true)
+    const ok = await onApply(instruction)
+    if (ok) setText('')
+    setWorking(false)
+  }
+
+  async function handleAudio(blob, language, extension) {
+    setWorking(true)
+    try {
+      const { text: heard } = await transcribeAudio(blob, language, extension)
+      if (!heard?.trim()) {
+        toast.error('We could not hear any words. Try again.')
+        setWorking(false)
+        return
+      }
+      await run(heard)
+    } catch (e) {
+      toast.error(e.message || 'Could not understand the recording.')
+      setWorking(false)
+    }
+  }
+
   return (
-    <div className="grid grid-cols-3 gap-2 text-sm py-2 border-b border-slate-50 last:border-0">
-      <span className="text-xs font-medium text-slate-400 pt-0.5">{label}</span>
-      <span className="col-span-2 text-slate-800">{value}</span>
+    <section aria-labelledby="voice-edit" className="on-haldi rounded-[28px] bg-haldi p-5 sm:p-6">
+      <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+        <VoiceCapture onAudio={handleAudio} disabled={working || busy} size="md" layout="row" showLanguages={false}
+          idleLabel={working ? 'Updating your page…' : 'Tell us what to change'} />
+      </div>
+      <h2 id="voice-edit" className="sr-only">Change your shop by voice or text</h2>
+      <form onSubmit={e => { e.preventDefault(); if (text.trim()) run(text.trim()) }} className="mt-5 flex gap-2">
+        <label htmlFor="change-text" className="sr-only">Or type a change</label>
+        <input id="change-text" value={text} onChange={e => setText(e.target.value)} disabled={working} maxLength={2000}
+          placeholder="Or type: add mango juice for ₹30" className="field border-0" />
+        <button type="submit" disabled={working || !text.trim()} className="btn-ink shrink-0 px-4 disabled:bg-neel/20 disabled:text-neel/70 disabled:opacity-100" aria-label="Apply change">
+          {working ? <Loader2 className="h-5 w-5 spin-slow" /> : <Send className="h-5 w-5" />}
+        </button>
+      </form>
+      {lastChange ? (
+        <p className="mt-3 flex items-center gap-2 font-medium text-neel-900" aria-live="polite">
+          <Wand2 className="h-4 w-4 shrink-0" aria-hidden="true" /> {lastChange}
+        </p>
+      ) : (
+        <p className="mt-3 text-sm text-neel-700">For example: “Change timing to 9 AM to 9 PM”, “Remove Amul butter”, “Sunday closed”.</p>
+      )}
+    </section>
+  )
+}
+
+function Field({ label, value, onChange, textarea = false, hint, ...rest }) {
+  const id = `edit-${label.replace(/\W+/g, '-').toLowerCase()}`
+  const Tag = textarea ? 'textarea' : 'input'
+  return (
+    <div>
+      <label htmlFor={id} className="field-label">{label}</label>
+      <Tag id={id} value={value || ''} onChange={e => onChange(e.target.value)} className={`field ${textarea ? 'min-h-[7rem] resize-y' : ''}`} {...rest} />
+      {hint && <p className="mt-1 text-sm text-neel-500">{hint}</p>}
+    </div>
+  )
+}
+
+function DetailsTab({ form, set }) {
+  return (
+    <div className="grid gap-5">
+      <div className="grid gap-5 sm:grid-cols-2">
+        <Field label="Shop name" value={form.shopName} onChange={v => set({ shopName: v })} maxLength={100} />
+        <Field label="Type of shop" value={form.category} onChange={v => set({ category: v })} placeholder="grocery, bakery, salon…" maxLength={40} />
+      </div>
+      <Field label="Tagline" value={form.tagline} onChange={v => set({ tagline: v })} maxLength={140} hint="One short line under your shop name." />
+      <Field label="About your shop" value={form.description} onChange={v => set({ description: v })} textarea maxLength={1500} />
+      <div className="grid gap-5 sm:grid-cols-2">
+        <Field label="WhatsApp number" value={form.whatsapp} onChange={v => set({ whatsapp: v })} type="tel" inputMode="tel" hint="Orders are sent here." />
+        <Field label="Phone number" value={form.phone} onChange={v => set({ phone: v })} type="tel" inputMode="tel" />
+      </div>
+      <Field label="Address" value={form.address} onChange={v => set({ address: v })} maxLength={300} placeholder="Shop 5, Karve Road, Kothrud, Pune" />
+      <Field label="Opening hours" value={form.timing} onChange={v => set({ timing: v })} maxLength={120} placeholder="8:00 AM – 10:00 PM, Mon–Sat"
+        hint="Write days and times like this to show customers “Open now”." />
+      <div className="grid gap-5 sm:grid-cols-2">
+        <Field label="Email" value={form.email} onChange={v => set({ email: v })} type="email" />
+        <Field label="Instagram" value={form.instagram} onChange={v => set({ instagram: v })} placeholder="@yourshop" />
+      </div>
+    </div>
+  )
+}
+
+function ItemsTab({ form, set, shopId, onPhotoSaved }) {
+  const products = form.products
+
+  function update(i, patch) {
+    set({ products: products.map((p, idx) => (idx === i ? { ...p, ...patch } : p)) })
+  }
+
+  function remove(i) {
+    set({ products: products.filter((_, idx) => idx !== i) })
+  }
+
+  async function setPhoto(i, image) {
+    const next = { ...form, products: products.map((p, idx) => (idx === i ? { ...p, image } : p)) }
+    set(next)
+    await onPhotoSaved(next)
+  }
+
+  const suggestedCount = products.filter(p => p.suggested).length
+
+  return (
+    <div className="grid gap-4">
+      {suggestedCount > 0 && (
+        <p className="flex items-start gap-2 rounded-2xl bg-haldi-soft px-4 py-3 text-neel-900">
+          <Sparkles className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>{suggestedCount} {suggestedCount === 1 ? 'item was' : 'items were'} suggested by VaaniShop. Check the prices, then tap <strong>Keep</strong> or delete them.</span>
+        </p>
+      )}
+
+      {products.length === 0 && <p className="rounded-2xl bg-white p-6 text-center text-neel-500">No items yet. Add your first item below, or say “add sugar for ₹45 per kilo”.</p>}
+
+      <ul className="grid gap-3">
+        {products.map((p, i) => (
+          <li key={i} className={`panel p-4 ${p.suggested ? 'border-haldi' : ''}`}>
+            <div className="flex gap-4">
+              <PhotoButton shopId={shopId} image={p.image} emoji={p.emoji || categoryEmoji(form.category)} label={p.name || 'this item'}
+                onUploaded={url => setPhoto(i, url)} onRemove={() => setPhoto(i, '')} />
+              <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-[1fr_9rem]">
+                <input aria-label="Item name" value={p.name} onChange={e => update(i, { name: e.target.value })} placeholder="Item name" maxLength={100} className="field py-2.5 font-semibold" />
+                <input aria-label="Price" value={p.price} onChange={e => update(i, { price: e.target.value })} placeholder="₹50/kg" maxLength={40} className="field py-2.5" />
+                <input aria-label="Short description" value={p.description} onChange={e => update(i, { description: e.target.value })} placeholder="Short description" maxLength={300} className="field py-2.5 sm:col-span-2" />
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-neel-100 pt-3">
+              <label className="flex items-center gap-2 text-sm text-neel-500">
+                Group
+                <input value={p.category} onChange={e => update(i, { category: e.target.value })} placeholder="Staples" maxLength={40} className="field w-32 px-2.5 py-1.5 text-sm" />
+              </label>
+              <label className="flex items-center gap-2 text-sm text-neel-500">
+                Icon
+                <input value={p.emoji} onChange={e => update(i, { emoji: e.target.value })} placeholder="🍚" maxLength={8} className="field w-14 px-2 py-1.5 text-center text-lg" />
+              </label>
+              <span className="flex-1" />
+              {p.suggested && (
+                <button type="button" onClick={() => update(i, { suggested: false })} className="btn-haldi btn-sm"><Check className="h-4 w-4" aria-hidden="true" /> Keep</button>
+              )}
+              <button type="button" onClick={() => remove(i)} className="btn-ghost btn-sm text-sindoor hover:bg-sindoor-soft" aria-label={`Delete ${p.name || 'item'}`}>
+                <Trash2 className="h-4 w-4" aria-hidden="true" /> Delete
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      <button type="button" onClick={() => set({ products: [...products, { ...EMPTY_PRODUCT }] })} className="btn-line border-dashed py-4">
+        <Plus className="h-5 w-5" aria-hidden="true" /> Add an item
+      </button>
+    </div>
+  )
+}
+
+function PhotoButton({ shopId, image, emoji, label, onUploaded, onRemove, wide = false }) {
+  const inputRef = useRef(null)
+  const [uploading, setUploading] = useState(false)
+
+  async function handleFile(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setUploading(true)
+    try {
+      const blob = await resizeImage(file, wide ? 1600 : 900)
+      const res = await uploadShopImage(shopId, blob)
+      await onUploaded(res.url)
+      toast.success('Photo added')
+    } catch (err) {
+      toast.error(err.message || 'Could not add the photo')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const size = wide ? 'aspect-[16/9] w-full rounded-3xl' : 'h-20 w-20 rounded-2xl'
+  return (
+    <div className={`relative shrink-0 ${wide ? 'w-full' : ''}`}>
+      <button type="button" onClick={() => inputRef.current?.click()} disabled={uploading}
+        className={`group relative grid place-items-center overflow-hidden bg-neel-50 text-3xl ${size}`}
+        aria-label={image ? `Change photo of ${label}` : `Add photo of ${label}`}>
+        {image ? <img src={imageUrl(image)} alt="" className="h-full w-full object-cover" /> : <span aria-hidden="true">{wide ? <ImagePlus className="h-8 w-8 text-neel-300" /> : emoji}</span>}
+        <span className={`absolute inset-0 grid place-items-center bg-neel-900/55 text-white transition-opacity ${uploading ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100'}`}>
+          {uploading ? <Loader2 className="h-6 w-6 spin-slow" /> : <Camera className="h-6 w-6" />}
+        </span>
+      </button>
+      {image && !uploading && (
+        <button type="button" onClick={onRemove} aria-label={`Remove photo of ${label}`}
+          className="absolute -right-2 -top-2 grid h-7 w-7 place-items-center rounded-full bg-white text-neel-700 shadow-lift hover:text-sindoor">
+          <X className="h-4 w-4" />
+        </button>
+      )}
+      <input ref={inputRef} type="file" accept="image/*" onChange={handleFile} className="hidden" />
+    </div>
+  )
+}
+
+function LookTab({ form, set, shopId, onPhotoSaved }) {
+  async function setCover(coverImage) {
+    const next = { ...form, coverImage }
+    set(next)
+    await onPhotoSaved(next)
+  }
+  return (
+    <div className="grid gap-8">
+      <section>
+        <h2 id="look-colour" className="text-lg font-semibold">Colour</h2>
+        <p className="mb-4 text-neel-500">Used for your awning, buttons and headings.</p>
+        <ThemePicker value={form.theme} onChange={theme => set({ theme })} labelledBy="look-colour" />
+      </section>
+      <section>
+        <h2 className="text-lg font-semibold">Shop photo</h2>
+        <p className="mb-4 text-neel-500">A wide photo of your shop front or counter, shown under your name.</p>
+        <PhotoButton wide shopId={shopId} image={form.coverImage} label="your shop" onUploaded={setCover} onRemove={() => setCover('')} />
+      </section>
+    </div>
+  )
+}
+
+function ShareTab({ shop, url }) {
+  return (
+    <div className="grid gap-6">
+      <section className="panel p-5 sm:p-6">
+        <h2 className="text-lg font-semibold">Your link</h2>
+        <div className="mt-3 flex items-center gap-2 rounded-2xl border border-neel-100 bg-neel-50 p-1.5 pl-4">
+          <span className="min-w-0 flex-1 truncate font-medium text-neel-700">{url.replace(/^https?:\/\//, '')}</span>
+          <button type="button" onClick={() => { navigator.clipboard?.writeText(url); toast.success('Link copied') }} className="btn-line btn-sm shrink-0">
+            <Copy className="h-4 w-4" aria-hidden="true" /> Copy
+          </button>
+        </div>
+        <a href={whatsappShareLink(shareText(shop.data.shopName, url))} target="_blank" rel="noreferrer" className="btn-paan mt-4 w-full py-4 sm:w-auto">
+          <MessageCircle className="h-5 w-5" aria-hidden="true" /> Share on WhatsApp
+        </a>
+      </section>
+      <section className="panel p-5 sm:p-6">
+        <QrCard url={url} fileName={shop.slug || 'shop'} posterTo={`/manage/${shop.shopId}/poster`} />
+      </section>
     </div>
   )
 }

@@ -10,6 +10,7 @@ import ShopListPage from './pages/ShopListPage.jsx'
 import CreateShopPage from './pages/CreateShopPage.jsx'
 import ShopDetailPage from './pages/ShopDetailPage.jsx'
 import PublicShopPage from './pages/PublicShopPage.jsx'
+import PosterPage from './pages/PosterPage.jsx'
 import NotFoundPage from './pages/NotFoundPage.jsx'
 
 export default function App() {
@@ -20,14 +21,16 @@ export default function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
-
           <Route path="/dashboard" element={<ProtectedRoute><ShopListPage /></ProtectedRoute>} />
-          <Route path="/create" element={<ProtectedRoute><CreateShopPage /></ProtectedRoute>} />
           <Route path="/manage/:id" element={<ProtectedRoute><ShopDetailPage /></ProtectedRoute>} />
-
-          <Route path="/shop/:id" element={<PublicShopPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
+
+        {/* Full-screen pages with their own chrome. Creating works before signing up. */}
+        <Route path="/create" element={<CreateShopPage />} />
+        <Route path="/manage/:id/poster" element={<ProtectedRoute><PosterPage /></ProtectedRoute>} />
+        <Route path="/s/:slug" element={<PublicShopPage />} />
+        <Route path="/shop/:id" element={<PublicShopPage />} />
       </Routes>
     </ErrorBoundary>
   )

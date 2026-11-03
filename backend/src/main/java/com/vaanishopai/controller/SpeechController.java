@@ -34,12 +34,19 @@ public class SpeechController {
     if (audio.getSize() > 25 * 1024 * 1024) throw new BadRequestException("audio too large (max 25MB)");
     try {
       var lang = language != null && language.matches("[a-z]{2}") ? language : null;
-      String text = speechService.transcribeWebmOpus(audio.getBytes(), lang);
+      String text = speechService.transcribe(audio.getBytes(), audioExtension(audio.getOriginalFilename()), lang);
       return new SpeechTranscribeResponse(text);
     } catch (BadRequestException e) {
       throw e;
     } catch (Exception e) {
       throw new BadRequestException("Failed to read audio");
     }
+  }
+
+  /** Safari records mp4 and Firefox ogg; Groq picks the decoder from the file extension. */
+  static String audioExtension(String filename) {
+    if (filename == null) return "webm";
+    var ext = filename.substring(filename.lastIndexOf('.') + 1).toLowerCase(java.util.Locale.ROOT);
+    return java.util.Set.of("webm", "mp4", "m4a", "ogg", "wav", "mp3").contains(ext) ? ext : "webm";
   }
 }

@@ -29,6 +29,13 @@ class AiJsonNormalizerTest {
   }
 
   @Test
+  void loneWhatsappNumberAlsoBecomesThePhone() {
+    var s = normalizer.normalize("{\"shopName\":\"X\",\"phone\":\"\",\"whatsapp\":\"9822012345\"}").schema();
+    assertEquals("9822012345", s.phone());
+    assertEquals("9822012345", s.whatsapp());
+  }
+
+  @Test
   void convertsNumericPricesToRupeeStrings() {
     var s = normalizer.normalize("""
         {"shopName":"X","products":[{"name":"Dal","price":120},{"name":"Oil","price":149.50}]}

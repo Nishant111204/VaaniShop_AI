@@ -32,7 +32,9 @@ public class AiJsonNormalizer {
       throw new BadRequestException("AI returned non-object JSON");
     }
 
-    var phone = text(root, "phone", "");
+    // Shopkeepers usually give one number; the prompt asks the AI to copy it to both
+    // fields, but it doesn't always, so enforce it here.
+    var phone = text(root, "phone", text(root, "whatsapp", ""));
     List<ShopSchema.Product> products = new ArrayList<>();
     List<String> refs = new ArrayList<>();
     var productsNode = root.get("products");
