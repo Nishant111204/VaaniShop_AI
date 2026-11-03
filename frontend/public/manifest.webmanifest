@@ -1,0 +1,16 @@
+{
+  "name": "VaaniShop — your shop online, by voice",
+  "short_name": "VaaniShop",
+  "description": "Update your shop's prices, photos and timings by voice, and see your WhatsApp orders.",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#FFC53D",
+  "theme_color": "#FFC53D",
+  "lang": "en-IN",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
