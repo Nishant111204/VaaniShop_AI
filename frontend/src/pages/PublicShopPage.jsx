@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import ShopSite from '../components/ShopSite.jsx'
 import Spinner from '../components/Spinner.jsx'
-import { getShop, getShopBySlug } from '../lib/api.js'
+import { getShop, getShopBySlug, trackEvent } from '../lib/api.js'
 import { getTheme, shopPath, shopUrl } from '../lib/shop.js'
 
 /** The shop's own website, without any VaaniShop navigation around it. */
@@ -58,7 +58,7 @@ export default function PublicShopPage() {
 
   return (
     <div className="min-h-dvh">
-      <ShopSite data={shop.data} url={shopUrl(shop)} basketKey={shop.shopId} live />
+      <ShopSite data={shop.data} url={shopUrl(shop)} basketKey={shop.shopId} live onTrack={type => trackEvent(shop.shopId, type)} />
     </div>
   )
 }

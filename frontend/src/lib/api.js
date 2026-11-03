@@ -107,6 +107,24 @@ export function getOwnedShop(shopId) {
   return request(`/api/shop/manage/${shopId}`, { headers: authHeaders() })
 }
 
+/** Daily visits and customer taps for one of your shops, oldest day first. */
+export function getShopStats(shopId, days = 30) {
+  return request(`/api/shop/${shopId}/stats?days=${days}`, { headers: authHeaders() })
+}
+
+/**
+ * Tells the shop owner's insights that a customer tapped Order, WhatsApp, Call,
+ * Directions or Share. Fire-and-forget: it must never slow down or break the tap.
+ */
+export function trackEvent(shopId, type) {
+  const url = `${BASE_URL}/api/shop/${shopId}/events`
+  const body = JSON.stringify({ type })
+  try {
+    if (navigator.sendBeacon?.(url, new Blob([body], { type: 'application/json' }))) return
+  } catch { /* fall through to fetch */ }
+  fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true }).catch(() => {})
+}
+
 export function getMyShops() {
   return request('/api/shop/my', { headers: authHeaders() })
 }

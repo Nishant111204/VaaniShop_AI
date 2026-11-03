@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { Link } from 'react-router-dom'
-import { Copy, ExternalLink, Eye, Mic, Package, Pencil, Trash2 } from 'lucide-react'
+import { Copy, ExternalLink, Eye, Mic, Package, Pencil, ShoppingBasket, Trash2 } from 'lucide-react'
 import Modal from '../components/Modal.jsx'
 import Spinner from '../components/Spinner.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
@@ -19,9 +19,15 @@ function ShopCard({ shop, onDelete }) {
         </p>
         <h2 className="sign mt-1 break-words text-[1.9rem]" style={{ color: t.ink }}>{shop.shopName}</h2>
         {shop.tagline && <p className="mt-1 text-neel-500 line-clamp-2">{shop.tagline}</p>}
-        <p className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-sm font-medium text-neel-700">
-          <span className="inline-flex items-center gap-1.5"><Eye className="h-4 w-4 text-neel-300" aria-hidden="true" /> {shop.viewCount} {shop.viewCount === 1 ? 'visit' : 'visits'}</span>
-          <span className="inline-flex items-center gap-1.5"><Package className="h-4 w-4 text-neel-300" aria-hidden="true" /> {shop.productCount} {shop.productCount === 1 ? 'item' : 'items'}</span>
+        <div className="mt-4 rounded-2xl bg-neel-50 px-3.5 py-2.5">
+          <p className="text-xs font-medium text-neel-500">This week</p>
+          <p className="mt-0.5 flex flex-wrap gap-x-4 gap-y-1 text-sm font-semibold text-neel-900">
+            <span className="inline-flex items-center gap-1.5"><Eye className="h-4 w-4 text-neel-500" aria-hidden="true" /> {shop.visitsLast7Days} {shop.visitsLast7Days === 1 ? 'visit' : 'visits'}</span>
+            <span className="inline-flex items-center gap-1.5"><ShoppingBasket className="h-4 w-4 text-neel-500" aria-hidden="true" /> {shop.ordersLast7Days} {shop.ordersLast7Days === 1 ? 'order' : 'orders'}</span>
+          </p>
+        </div>
+        <p className="mt-2 flex items-center gap-1.5 text-sm text-neel-500">
+          <Package className="h-4 w-4" aria-hidden="true" /> {shop.productCount} {shop.productCount === 1 ? 'item' : 'items'} on the price list
         </p>
         <div className="mt-auto flex gap-2 pt-5">
           <Link to={`/manage/${shop.shopId}`} className="btn-ink btn-sm flex-1"><Pencil className="h-4 w-4" aria-hidden="true" /> Edit</Link>
@@ -68,6 +74,7 @@ export default function ShopListPage() {
 
   const firstName = (user?.name || '').split(' ')[0]
   const totalViews = shops.reduce((sum, s) => sum + (s.viewCount || 0), 0)
+  const weekOrders = shops.reduce((sum, s) => sum + (s.ordersLast7Days || 0), 0)
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
@@ -78,6 +85,7 @@ export default function ShopListPage() {
           {shops.length > 0 && (
             <p className="mt-1 text-neel-700">
               {shops.length} {shops.length === 1 ? 'shop' : 'shops'} online, visited {totalViews} {totalViews === 1 ? 'time' : 'times'} so far.
+              {weekOrders > 0 && ` ${weekOrders} ${weekOrders === 1 ? 'order' : 'orders'} started on WhatsApp this week.`}
             </p>
           )}
         </div>

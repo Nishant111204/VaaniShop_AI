@@ -19,8 +19,9 @@ import { loadBasket, saveBasket } from '../lib/storage.js'
  * @param basketKey    where the customer's basket is remembered; null keeps it in memory
  * @param live         true on the real public page (adds the map and QR code)
  * @param showSuggested tag items the AI added, so the owner can review them
+ * @param onTrack      called with "order", "whatsapp", "call", "directions" or "share" when a customer taps one
  */
-export default function ShopSite({ data: d, url = null, basketKey = null, live = false, showSuggested = false }) {
+export default function ShopSite({ data: d, url = null, basketKey = null, live = false, showSuggested = false, onTrack = () => {} }) {
   const [basket, setBasket] = useState(() => (basketKey ? loadBasket(basketKey) : {}))
   const [query, setQuery] = useState('')
   const [group, setGroup] = useState(null)
@@ -63,6 +64,7 @@ export default function ShopSite({ data: d, url = null, basketKey = null, live =
 
   function share() {
     if (!url) return
+    onTrack('share')
     if (navigator.share) {
       navigator.share({ title: d.shopName, text: d.tagline || d.shopName, url }).catch(() => {})
     } else {
@@ -72,9 +74,9 @@ export default function ShopSite({ data: d, url = null, basketKey = null, live =
   }
 
   const actions = [
-    telLink(d.phone) && { label: 'Call', icon: Phone, href: telLink(d.phone) },
-    canOrder && { label: 'WhatsApp', icon: MessageCircle, href: whatsappLink(waContact, `Hello ${d.shopName}!`), whatsapp: true },
-    mapsLink(d.address) && { label: 'Directions', icon: Navigation, href: mapsLink(d.address) },
+    telLink(d.phone) && { label: 'Call', icon: Phone, href: telLink(d.phone), track: 'call' },
+    canOrder && { label: 'WhatsApp', icon: MessageCircle, href: whatsappLink(waContact, `Hello ${d.shopName}!`), whatsapp: true, track: 'whatsapp' },
+    mapsLink(d.address) && { label: 'Directions', icon: Navigation, href: mapsLink(d.address), track: 'directions' },
     url && { label: 'Share', icon: Share2, onClick: share },
   ].filter(Boolean)
 
@@ -110,7 +112,7 @@ export default function ShopSite({ data: d, url = null, basketKey = null, live =
               )
               const cls = 'flex flex-col items-center gap-1.5 rounded-2xl py-2 transition-colors hover:bg-[var(--soft)]'
               return a.href ? (
-                <a key={a.label} href={a.href} target={a.href.startsWith('tel:') ? undefined : '_blank'} rel="noreferrer" className={cls}>{inner}</a>
+                <a key={a.label} href={a.href} target={a.href.startsWith('tel:') ? undefined : '_blank'} rel="noreferrer" className={cls} onClick={() => onTrack(a.track)}>{inner}</a>
               ) : (
                 <button key={a.label} type="button" onClick={a.onClick} className={cls}>{inner}</button>
               )
@@ -208,10 +210,10 @@ export default function ShopSite({ data: d, url = null, basketKey = null, live =
               {d.timing && <Row icon={Clock} label="Timings">{d.timing}</Row>}
               {d.address && (
                 <Row icon={MapPin} label="Address">
-                  <a href={mapsLink(d.address)} target="_blank" rel="noreferrer" className="underline decoration-neel-200 underline-offset-4 hover:decoration-[var(--accent)]">{d.address}</a>
+                  <a href={mapsLink(d.address)} target="_blank" rel="noreferrer" onClick={() => onTrack('directions')} className="underline decoration-neel-200 underline-offset-4 hover:decoration-[var(--accent)]">{d.address}</a>
                 </Row>
               )}
-              {d.phone && <Row icon={Phone} label="Phone"><a href={telLink(d.phone)} className="font-semibold tabular-nums">{d.phone}</a></Row>}
+              {d.phone && <Row icon={Phone} label="Phone"><a href={telLink(d.phone)} onClick={() => onTrack('call')} className="font-semibold tabular-nums">{d.phone}</a></Row>}
               {d.email && <Row icon={Mail} label="Email"><a href={`mailto:${d.email}`} className="break-all">{d.email}</a></Row>}
               {d.instagram && (
                 <Row icon={AtSign} label="Instagram">
@@ -266,7 +268,7 @@ export default function ShopSite({ data: d, url = null, basketKey = null, live =
               className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-white/70 hover:bg-white/10 hover:text-white">
               <X className="h-5 w-5" />
             </button>
-            <a href={whatsappLink(waContact, orderMessage(d.shopName, lines, total, hasUnpriced))} target="_blank" rel="noreferrer" className="btn-paan btn-sm shrink-0">
+            <a href={whatsappLink(waContact, orderMessage(d.shopName, lines, total, hasUnpriced))} target="_blank" rel="noreferrer" onClick={() => onTrack('order')} className="btn-paan btn-sm shrink-0">
               <MessageCircle className="h-4 w-4" aria-hidden="true" /> Order
             </a>
           </div>

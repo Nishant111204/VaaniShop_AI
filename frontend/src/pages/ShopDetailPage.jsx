@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router-dom'
 import {
   ArrowLeft, Camera, Check, Copy, ExternalLink, ImagePlus, Loader2, MessageCircle, Plus, Send, Sparkles, Trash2, Wand2, X,
 } from 'lucide-react'
+import Insights from '../components/Insights.jsx'
 import PhoneFrame from '../components/PhoneFrame.jsx'
 import QrCard from '../components/QrCard.jsx'
 import ShopSite from '../components/ShopSite.jsx'
@@ -21,6 +22,7 @@ const TABS = [
   { key: 'items', label: 'Items' },
   { key: 'look', label: 'Look' },
   { key: 'share', label: 'Share' },
+  { key: 'insights', label: 'Insights' },
   { key: 'preview', label: 'Preview', mobileOnly: true },
 ]
 
@@ -143,6 +145,7 @@ export default function ShopDetailPage() {
             {tab === 'items' && <ItemsTab form={form} set={set} shopId={id} onPhotoSaved={next => save(next, { quiet: true })} />}
             {tab === 'look' && <LookTab form={form} set={set} shopId={id} onPhotoSaved={next => save(next, { quiet: true })} />}
             {tab === 'share' && <ShareTab shop={shop} url={url} />}
+            {tab === 'insights' && <Insights shopId={id} onShare={() => setTab('share')} />}
             {tab === 'preview' && (
               <PhoneFrame responsive>
                 <ShopSite data={form} url={url} />
