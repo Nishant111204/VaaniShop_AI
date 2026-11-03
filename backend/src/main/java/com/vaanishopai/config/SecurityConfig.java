@@ -4,12 +4,14 @@ import com.vaanishopai.security.JwtAuthFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -42,12 +44,18 @@ public class SecurityConfig {
         .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(auth -> auth
             .requestMatchers("/api/auth/**").permitAll()
+            .requestMatchers(HttpMethod.GET, "/api/shop/my").authenticated()
             .requestMatchers(HttpMethod.GET, "/api/shop/{id}").permitAll()
             .requestMatchers(HttpMethod.GET, "/api/shop/s/{slug}").permitAll()
+            .requestMatchers(HttpMethod.GET, "/api/images/{id}").permitAll()
+            // Visitors can try the voice builder before signing up; both are rate limited per IP.
+            .requestMatchers(HttpMethod.POST, "/api/shop/generate").permitAll()
+            .requestMatchers(HttpMethod.POST, "/api/speech/transcribe").permitAll()
             .requestMatchers("/actuator/health", "/actuator/info").permitAll()
-            .requestMatchers("/api/speech/**").permitAll()
+            .requestMatchers("/error").permitAll()
             .anyRequest().authenticated()
         )
+        .exceptionHandling(e -> e.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
         .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
         .build();
   }

@@ -104,6 +104,9 @@ export default function PublicShopPage() {
                 </span>
               )}
             </div>
+            {d.tagline && (
+              <p className="mt-2 text-base font-medium text-white/90 italic">"{d.tagline}"</p>
+            )}
             {d.description && (
               <p className="mt-3 text-sm text-white/80 max-w-lg leading-relaxed">{d.description}</p>
             )}
@@ -176,22 +179,9 @@ export default function PublicShopPage() {
             </h2>
           </div>
           {d.products?.length ? (
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2">
               {d.products.map((p, idx) => (
-                <div key={idx} className="rounded-xl border bg-white p-4 hover:shadow-sm transition-shadow">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="font-medium text-slate-900 leading-snug">{p.name || 'Product'}</div>
-                    {p.price && (
-                      <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${t.badge}`}>
-                        {p.price}
-                      </span>
-                    )}
-                  </div>
-                  {p.description && <p className="mt-2 text-xs text-slate-500 leading-relaxed">{p.description}</p>}
-                  {p.category && (
-                    <span className="mt-2 inline-block text-xs text-slate-400 capitalize">{p.category}</span>
-                  )}
-                </div>
+                <ProductCard key={idx} product={p} badge={t.badge} />
               ))}
             </div>
           ) : (
@@ -272,6 +262,48 @@ export default function PublicShopPage() {
             </Link>
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+function ProductCard({ product: p, badge }) {
+  const keyword = p.imageKeyword || p.name || p.category || 'product'
+  const imgUrl = `https://source.unsplash.com/400x300/?${encodeURIComponent(keyword)}`
+  const [imgErr, setImgErr] = useState(false)
+
+  return (
+    <div className="rounded-2xl border bg-white overflow-hidden hover:shadow-md transition-shadow group">
+      {!imgErr ? (
+        <div className="relative h-44 bg-slate-100 overflow-hidden">
+          <img
+            src={imgUrl}
+            alt={p.name}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            onError={() => setImgErr(true)}
+          />
+          {p.price && (
+            <span className={`absolute top-2 right-2 rounded-full px-2.5 py-1 text-xs font-bold shadow ${badge}`}>
+              {p.price}
+            </span>
+          )}
+        </div>
+      ) : (
+        <div className="h-16 bg-gradient-to-r from-slate-50 to-slate-100" />
+      )}
+      <div className="p-4">
+        <div className="flex items-start justify-between gap-2">
+          <div className="font-semibold text-slate-900 leading-snug">{p.name || 'Product'}</div>
+          {imgErr && p.price && (
+            <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${badge}`}>
+              {p.price}
+            </span>
+          )}
+        </div>
+        {p.description && <p className="mt-1.5 text-xs text-slate-500 leading-relaxed line-clamp-2">{p.description}</p>}
+        {p.category && (
+          <span className="mt-2 inline-block text-xs text-slate-400 capitalize bg-slate-50 px-2 py-0.5 rounded-full">{p.category}</span>
+        )}
       </div>
     </div>
   )

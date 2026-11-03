@@ -2,16 +2,16 @@ package com.vaanishopai.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.vaanishopai.dto.ShopSchema;
 import com.vaanishopai.exception.BadRequestException;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
-@Service
+/** Turns the AI's raw text reply into a sanitized {@link ShopSchema}. */
+@Component
 public class AiJsonNormalizer {
 
   private final ObjectMapper objectMapper;
@@ -20,7 +20,7 @@ public class AiJsonNormalizer {
     this.objectMapper = objectMapper;
   }
 
-  public NormalizedShop normalizeStrict(String raw) {
+  public ParsedShop normalize(String raw) {
     var jsonText = extractLikelyJson(raw);
     final JsonNode root;
     try {
@@ -32,69 +32,59 @@ public class AiJsonNormalizer {
       throw new BadRequestException("AI returned non-object JSON");
     }
 
-    var shopName  = text(root, "shopName",  "My Shop");
-    var description = text(root, "description", "");
-    var category  = text(root, "category",  "");
-    var address   = text(root, "address",   "");
-    var phone     = text(root, "phone",     "");
-    var whatsapp  = text(root, "whatsapp",  phone);
-    var email     = text(root, "email",     "");
-    var timing    = text(root, "timing",    "");
-    var instagram = text(root, "instagram", "");
-    var theme     = text(root, "theme",     "slate");
-
+    var phone = text(root, "phone", "");
     List<ShopSchema.Product> products = new ArrayList<>();
+    List<String> refs = new ArrayList<>();
     var productsNode = root.get("products");
     if (productsNode != null && productsNode.isArray()) {
       for (JsonNode p : productsNode) {
-        if (p != null && p.isObject()) {
-          products.add(new ShopSchema.Product(
-              text(p, "name", ""),
-              text(p, "price", ""),
-              text(p, "description", ""),
-              text(p, "category", "")
-          ));
-        }
+        if (p == null || !p.isObject()) continue;
+        var product = ShopSanitizer.product(new ShopSchema.Product(
+            text(p, "name", ""),
+            price(p.get("price")),
+            text(p, "description", ""),
+            text(p, "category", ""),
+            text(p, "emoji", ""),
+            "",
+            p.path("suggested").asBoolean(false)));
+        if (product.name().isEmpty()) continue;
+        products.add(product);
+        refs.add(text(p, "ref", ""));
       }
     }
 
-    var schema = new ShopSchema(shopName, description, category, address, phone, whatsapp, email, timing, instagram, theme, products);
+    var schema = ShopSanitizer.clean(new ShopSchema(
+        text(root, "shopName", "My Shop"),
+        text(root, "tagline", ""),
+        text(root, "description", ""),
+        text(root, "category", ""),
+        text(root, "address", ""),
+        phone,
+        text(root, "whatsapp", phone),
+        text(root, "email", ""),
+        text(root, "timing", ""),
+        text(root, "instagram", ""),
+        text(root, "theme", "slate"),
+        "",
+        products));
 
-    ObjectNode jsonb = objectMapper.createObjectNode();
-    jsonb.put("description", description);
-    jsonb.put("category", category);
-    jsonb.put("address", address);
-    jsonb.put("phone", phone);
-    jsonb.put("whatsapp", whatsapp);
-    jsonb.put("email", email);
-    jsonb.put("timing", timing);
-    jsonb.put("instagram", instagram);
-    jsonb.put("theme", theme);
-
-    ArrayNode prods = objectMapper.createArrayNode();
-    for (var p : products) {
-      ObjectNode obj = objectMapper.createObjectNode();
-      obj.put("name", p.name() == null ? "" : p.name());
-      obj.put("price", p.price() == null ? "" : p.price());
-      obj.put("description", p.description() == null ? "" : p.description());
-      obj.put("category", p.category() == null ? "" : p.category());
-      prods.add(obj);
-    }
-    jsonb.set("products", prods);
-
-    try {
-      return new NormalizedShop(schema, objectMapper.writeValueAsString(jsonb));
-    } catch (Exception e) {
-      throw new BadRequestException("Failed to serialize normalized JSON");
-    }
+    // clean() drops nameless products, which were already skipped above, so refs stay aligned.
+    return new ParsedShop(schema, refs, text(root, "summary", ""));
   }
 
   private static String text(JsonNode node, String field, String def) {
     var child = node.get(field);
     if (child == null || child.isNull()) return def;
-    if (!child.isTextual()) return def;
+    if (!child.isTextual() && !child.isNumber()) return def;
     var v = child.asText();
-    return (v == null || v.isBlank()) ? def : v;
+    return v.isBlank() ? def : v;
+  }
+
+  /** Prices should be strings like "₹60/kg", but models sometimes return bare numbers. */
+  private static String price(JsonNode node) {
+    if (node == null || node.isNull()) return "";
+    if (node.isNumber()) return "₹" + new BigDecimal(node.asText()).stripTrailingZeros().toPlainString();
+    return node.isTextual() ? node.asText() : "";
   }
 
   private static String extractLikelyJson(String raw) {
@@ -114,5 +104,10 @@ public class AiJsonNormalizer {
     return s;
   }
 
-  public record NormalizedShop(ShopSchema schema, String jsonbData) {}
+  /**
+   * @param productRefs for each product, the "ref" the AI echoed back ("" for new items);
+   *                    used to carry photos across voice edits
+   * @param summary     the AI's one-line description of what it changed (updates only)
+   */
+  public record ParsedShop(ShopSchema schema, List<String> productRefs, String summary) {}
 }

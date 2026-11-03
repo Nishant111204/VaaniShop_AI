@@ -1,13 +1,16 @@
 package com.vaanishopai.controller;
 
 import com.vaanishopai.dto.*;
-import com.vaanishopai.exception.BadRequestException;
-import com.vaanishopai.model.User;
+import com.vaanishopai.security.CurrentUser;
+import com.vaanishopai.service.ImageService;
+import com.vaanishopai.service.RateLimitService;
 import com.vaanishopai.service.ShopService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
@@ -17,36 +20,63 @@ import java.util.UUID;
 public class ShopController {
 
   private final ShopService shopService;
+  private final ImageService imageService;
+  private final RateLimitService rateLimitService;
 
-  public ShopController(ShopService shopService) {
+  public ShopController(ShopService shopService, ImageService imageService, RateLimitService rateLimitService) {
     this.shopService = shopService;
+    this.imageService = imageService;
+    this.rateLimitService = rateLimitService;
+  }
+
+  /** Public: turns a description into a shop preview without saving anything. */
+  @PostMapping("/generate")
+  public ShopSchema generate(@Valid @RequestBody ShopCreateRequest req, HttpServletRequest request) {
+    rateLimitService.checkAi(request.getRemoteAddr());
+    return shopService.generateDraft(req.text());
+  }
+
+  /** Saves a previewed draft as a new shop. */
+  @PostMapping
+  @ResponseStatus(HttpStatus.CREATED)
+  public ShopResponse publish(@RequestBody ShopSchema draft) {
+    return shopService.publish(draft, CurrentUser.require());
   }
 
   @PostMapping("/create")
   public ShopResponse create(@Valid @RequestBody ShopCreateRequest req) {
-    return shopService.createFromText(req.text(), currentUser());
+    var user = CurrentUser.require();
+    rateLimitService.checkAi(user.getId().toString());
+    return shopService.createFromText(req.text(), user);
   }
 
   @PostMapping("/update")
   public ShopResponse update(@Valid @RequestBody ShopUpdateRequest req) {
-    return shopService.updateFromText(req.shopId(), req.text(), currentUser());
+    var user = CurrentUser.require();
+    rateLimitService.checkAi(user.getId().toString());
+    return shopService.updateFromText(req.shopId(), req.text(), user);
   }
 
   @PutMapping("/{id}/fields")
-  public ShopResponse updateFields(@PathVariable UUID id,
-                                   @RequestBody ShopUpdateFieldsRequest req) {
-    return shopService.updateFields(id, req, currentUser());
+  public ShopResponse updateFields(@PathVariable UUID id, @RequestBody ShopSchema fields) {
+    return shopService.updateFields(id, fields, CurrentUser.require());
+  }
+
+  @PostMapping(value = "/{id}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  @ResponseStatus(HttpStatus.CREATED)
+  public ImageUploadResponse uploadImage(@PathVariable UUID id, @RequestPart("image") MultipartFile image) {
+    return imageService.upload(id, image, CurrentUser.require());
   }
 
   @GetMapping("/my")
   public List<ShopSummary> myShops() {
-    return shopService.listByOwner(currentUser());
+    return shopService.listByOwner(CurrentUser.require());
   }
 
   /** Authenticated owner view — no view-count increment. */
   @GetMapping("/manage/{id}")
   public ShopResponse manage(@PathVariable("id") UUID id) {
-    return shopService.getOwned(id, currentUser());
+    return shopService.getOwned(id, CurrentUser.require());
   }
 
   /** Public view — increments view count. */
@@ -64,14 +94,6 @@ public class ShopController {
   @DeleteMapping("/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   public void delete(@PathVariable UUID id) {
-    shopService.delete(id, currentUser());
-  }
-
-  private User currentUser() {
-    var auth = SecurityContextHolder.getContext().getAuthentication();
-    if (auth == null || !(auth.getPrincipal() instanceof User user)) {
-      throw new BadRequestException("Not authenticated");
-    }
-    return user;
+    shopService.delete(id, CurrentUser.require());
   }
 }
