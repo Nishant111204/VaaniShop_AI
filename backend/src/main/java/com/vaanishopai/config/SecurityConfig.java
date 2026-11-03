@@ -72,6 +72,7 @@ public class SecurityConfig {
             // Visitors can try the voice builder before signing up; both are rate limited per IP.
             .requestMatchers(HttpMethod.POST, "/api/shop/generate").permitAll()
             .requestMatchers(HttpMethod.POST, "/api/speech/transcribe").permitAll()
+            .requestMatchers(HttpMethod.POST, "/api/shop/{id}/events").permitAll()
             .requestMatchers("/api/**").authenticated()
             .requestMatchers("/actuator/health", "/actuator/info").permitAll()
             .requestMatchers("/actuator/**").denyAll()

@@ -35,6 +35,11 @@ public class RateLimitService {
     check("speech:" + client, speechPerMinute);
   }
 
+  /** Customer taps reported by shop pages; generous, but stops counter stuffing. */
+  public void checkEvents(String client) {
+    check("events:" + client, 60);
+  }
+
   /** AI generation and edit calls, which are the expensive ones. */
   public void checkAi(String client) {
     check("ai:" + client, aiPerMinute);

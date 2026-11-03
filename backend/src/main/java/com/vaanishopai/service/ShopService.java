@@ -30,11 +30,16 @@ public class ShopService {
   private final ShopRepository repo;
   private final OpenAiService openAiService;
   private final ObjectMapper objectMapper;
+  private final StatsService stats;
+  private final PublicShopCache cache;
 
-  public ShopService(ShopRepository repo, OpenAiService openAiService, ObjectMapper objectMapper) {
+  public ShopService(ShopRepository repo, OpenAiService openAiService, ObjectMapper objectMapper, StatsService stats,
+                     PublicShopCache cache) {
     this.repo = repo;
     this.openAiService = openAiService;
     this.objectMapper = objectMapper;
+    this.stats = stats;
+    this.cache = cache;
   }
 
   /** Builds a shop from a description without saving it, so visitors can preview before signing up. */
@@ -69,29 +74,28 @@ public class ShopService {
     return save(shop, ShopSanitizer.clean(fields), null);
   }
 
-  @Transactional
+  // Public reads go through the cache and count visits in memory (see StatsService),
+  // so opening a shop page normally costs no database round trip at all.
+
   public ShopResponse getAndTrackView(UUID shopId) {
-    var shop = repo.findById(shopId).orElseThrow(() -> new NotFoundException("Shop not found"));
-    repo.incrementViewCount(shopId);
-    return toResponse(shop, toSchema(shop), null);
+    var shop = peek(shopId).orElseThrow(() -> new NotFoundException("Shop not found"));
+    stats.record(shopId, StatsService.Event.VISIT);
+    return shop;
   }
 
-  @Transactional
   public ShopResponse getBySlugAndTrackView(String slug) {
-    var shop = repo.findBySlug(slug).orElseThrow(() -> new NotFoundException("Shop not found"));
-    repo.incrementViewCount(shop.getId());
-    return toResponse(shop, toSchema(shop), null);
+    var shop = peekBySlug(slug).orElseThrow(() -> new NotFoundException("Shop not found"));
+    stats.record(shop.shopId(), StatsService.Event.VISIT);
+    return shop;
   }
 
-  /** For link previews: crawlers should not count as visits. */
-  @Transactional(readOnly = true)
+  /** Without counting a visit, e.g. for link previews fetched by crawlers. */
   public Optional<ShopResponse> peekBySlug(String slug) {
-    return repo.findBySlug(slug).map(shop -> toResponse(shop, toSchema(shop), null));
+    return cache.bySlug(slug, () -> repo.findBySlug(slug).map(shop -> toResponse(shop, toSchema(shop), null)));
   }
 
-  @Transactional(readOnly = true)
   public Optional<ShopResponse> peek(UUID shopId) {
-    return repo.findById(shopId).map(shop -> toResponse(shop, toSchema(shop), null));
+    return cache.byId(shopId, () -> repo.findById(shopId).map(shop -> toResponse(shop, toSchema(shop), null)));
   }
 
   @Transactional(readOnly = true)
@@ -107,9 +111,12 @@ public class ShopService {
 
   @Transactional(readOnly = true)
   public List<ShopSummary> listByOwner(User owner) {
-    return repo.findByOwnerOrderByCreatedAtDesc(owner).stream()
+    var shops = repo.findByOwnerOrderByCreatedAtDesc(owner);
+    var week = stats.lastWeek(shops.stream().map(Shop::getId).toList());
+    return shops.stream()
         .map(s -> {
           var schema = toSchema(s);
+          var w = week.getOrDefault(s.getId(), new int[2]);
           return new ShopSummary(
               s.getId(),
               s.getShopName(),
@@ -121,6 +128,8 @@ public class ShopService {
               schema.products().size(),
               s.getSlug(),
               s.getViewCount(),
+              w[0],
+              w[1],
               s.getCreatedAt());
         })
         .toList();
@@ -128,7 +137,21 @@ public class ShopService {
 
   @Transactional
   public void delete(UUID shopId, User owner) {
-    repo.delete(requireOwned(shopId, owner));
+    var shop = requireOwned(shopId, owner);
+    repo.delete(shop);
+    cache.evict(shop.getId(), shop.getSlug());
+  }
+
+  /** Customer actions on public pages; unknown shops are rejected so counters can't be planted. */
+  public void recordEvent(UUID shopId, StatsService.Event event) {
+    if (peek(shopId).isEmpty()) throw new NotFoundException("Shop not found");
+    stats.record(shopId, event);
+  }
+
+  @Transactional(readOnly = true)
+  public com.vaanishopai.dto.ShopStats stats(UUID shopId, int days, User owner) {
+    requireOwned(shopId, owner);
+    return stats.forShop(shopId, Math.max(7, Math.min(90, days)));
   }
 
   public Shop requireOwned(UUID shopId, User owner) {
@@ -146,7 +169,9 @@ public class ShopService {
     if (shop.getSlug() == null) {
       shop.setSlug(generateUniqueSlug(schema.shopName()));
     }
-    return toResponse(repo.save(shop), schema, changeSummary);
+    var saved = repo.save(shop);
+    cache.evict(saved.getId(), saved.getSlug());
+    return toResponse(saved, schema, changeSummary);
   }
 
   /** A draft has no shop yet, so it cannot own uploaded photos. */

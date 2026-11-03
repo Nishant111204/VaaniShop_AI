@@ -29,7 +29,8 @@ public class Shop {
   @Column(name = "slug", unique = true)
   private String slug;
 
-  @Column(name = "view_count", nullable = false)
+  /** Only ever incremented in SQL (StatsService); never written back from the entity. */
+  @Column(name = "view_count", nullable = false, updatable = false)
   private long viewCount = 0;
 
   @ManyToOne(fetch = FetchType.LAZY)
@@ -59,7 +60,6 @@ public class Shop {
   public String getSlug() { return slug; }
   public void setSlug(String slug) { this.slug = slug; }
   public long getViewCount() { return viewCount; }
-  public void incrementViewCount() { this.viewCount++; }
   public User getOwner() { return owner; }
   public void setOwner(User owner) { this.owner = owner; }
   public Instant getCreatedAt() { return createdAt; }

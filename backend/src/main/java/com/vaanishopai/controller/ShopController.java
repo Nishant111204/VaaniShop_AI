@@ -5,6 +5,7 @@ import com.vaanishopai.security.CurrentUser;
 import com.vaanishopai.service.ImageService;
 import com.vaanishopai.service.RateLimitService;
 import com.vaanishopai.service.ShopService;
+import com.vaanishopai.service.StatsService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -66,6 +67,19 @@ public class ShopController {
   @ResponseStatus(HttpStatus.CREATED)
   public ImageUploadResponse uploadImage(@PathVariable UUID id, @RequestPart("image") MultipartFile image) {
     return imageService.upload(id, image, CurrentUser.require());
+  }
+
+  /** Public: a customer tapped Order, WhatsApp, Call, Directions or Share on a shop page. */
+  @PostMapping("/{id}/events")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  public void event(@PathVariable UUID id, @Valid @RequestBody ShopEventRequest req, HttpServletRequest request) {
+    rateLimitService.checkEvents(request.getRemoteAddr());
+    shopService.recordEvent(id, StatsService.Event.parse(req.type()));
+  }
+
+  @GetMapping("/{id}/stats")
+  public ShopStats stats(@PathVariable UUID id, @RequestParam(defaultValue = "30") int days) {
+    return shopService.stats(id, days, CurrentUser.require());
   }
 
   @GetMapping("/my")

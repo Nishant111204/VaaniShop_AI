@@ -25,4 +25,10 @@ class RateLimitServiceTest {
     limiter.checkAi("1.1.1.1");
     assertDoesNotThrow(() -> limiter.checkSpeech("1.1.1.1"));
   }
+
+  @Test
+  void limitsShopPageEventsPerClient() {
+    for (int i = 0; i < 60; i++) limiter.checkEvents("3.3.3.3");
+    assertThrows(TooManyRequestsException.class, () -> limiter.checkEvents("3.3.3.3"));
+  }
 }

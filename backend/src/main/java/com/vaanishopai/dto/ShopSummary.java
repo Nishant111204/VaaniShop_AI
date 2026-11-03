@@ -14,5 +14,7 @@ public record ShopSummary(
     int productCount,
     String slug,
     long viewCount,
+    int visitsLast7Days,
+    int ordersLast7Days,
     Instant createdAt
 ) {}
