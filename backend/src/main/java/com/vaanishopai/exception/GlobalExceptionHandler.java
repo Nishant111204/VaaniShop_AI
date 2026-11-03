@@ -1,5 +1,6 @@
 package com.vaanishopai.exception;
 
+import com.vaanishopai.web.SpaPageService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,6 +21,12 @@ import java.time.Instant;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
   private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+  private final SpaPageService spaPages;
+
+  public GlobalExceptionHandler(SpaPageService spaPages) {
+    this.spaPages = spaPages;
+  }
 
   @ExceptionHandler(MethodArgumentNotValidException.class)
   public ResponseEntity<ApiError> handleValidation(MethodArgumentNotValidException ex, HttpServletRequest req) {
@@ -66,8 +73,13 @@ public class GlobalExceptionHandler {
   }
 
   @ExceptionHandler(NoResourceFoundException.class)
-  public ResponseEntity<ApiError> handleNoResource(NoResourceFoundException ex, HttpServletRequest req) {
-    return build(HttpStatus.NOT_FOUND, "Not found", req.getRequestURI());
+  public ResponseEntity<?> handleNoResource(NoResourceFoundException ex, HttpServletRequest req) {
+    var path = req.getRequestURI();
+    var accept = req.getHeader("Accept");
+    boolean page = "GET".equals(req.getMethod()) && accept != null && accept.contains("text/html")
+        && !path.startsWith("/api/") && !path.startsWith("/actuator");
+    if (page) return spaPages.app(HttpStatus.NOT_FOUND);
+    return build(HttpStatus.NOT_FOUND, "Not found", path);
   }
 
   @ExceptionHandler(HttpRequestMethodNotSupportedException.class)

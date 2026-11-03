@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class RateLimitServiceTest {
 
   private final RateLimitService limiter = new RateLimitService(
-      new AppProperties(null, null, null, new AppProperties.RateLimit(3, 2)));
+      new AppProperties(null, null, null, new AppProperties.RateLimit(3, 2), null));
 
   @Test
   void blocksAfterLimitPerClient() {

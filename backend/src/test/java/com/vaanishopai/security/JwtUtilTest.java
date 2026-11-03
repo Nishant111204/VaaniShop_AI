@@ -10,7 +10,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class JwtUtilTest {
 
   private static JwtUtil withSecret(String secret) {
-    return new JwtUtil(new AppProperties(null, new AppProperties.Jwt(secret, 60_000), null, null));
+    return new JwtUtil(new AppProperties(null, new AppProperties.Jwt(secret, 60_000), null, null, null));
   }
 
   @Test

@@ -16,6 +16,9 @@ public interface ShopRepository extends JpaRepository<Shop, UUID> {
   Optional<Shop> findBySlug(String slug);
   boolean existsBySlug(String slug);
 
+  @Query("SELECT s.slug, s.createdAt FROM Shop s WHERE s.slug IS NOT NULL ORDER BY s.createdAt DESC")
+  List<Object[]> findAllSlugs();
+
   @Modifying
   @Query("UPDATE Shop s SET s.viewCount = s.viewCount + 1 WHERE s.id = :id")
   void incrementViewCount(@Param("id") UUID id);

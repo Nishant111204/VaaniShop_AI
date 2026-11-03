@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.text.Normalizer;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -80,6 +81,22 @@ public class ShopService {
     var shop = repo.findBySlug(slug).orElseThrow(() -> new NotFoundException("Shop not found"));
     repo.incrementViewCount(shop.getId());
     return toResponse(shop, toSchema(shop), null);
+  }
+
+  /** For link previews: crawlers should not count as visits. */
+  @Transactional(readOnly = true)
+  public Optional<ShopResponse> peekBySlug(String slug) {
+    return repo.findBySlug(slug).map(shop -> toResponse(shop, toSchema(shop), null));
+  }
+
+  @Transactional(readOnly = true)
+  public Optional<ShopResponse> peek(UUID shopId) {
+    return repo.findById(shopId).map(shop -> toResponse(shop, toSchema(shop), null));
+  }
+
+  @Transactional(readOnly = true)
+  public List<Object[]> publicSlugs() {
+    return repo.findAllSlugs();
   }
 
   @Transactional(readOnly = true)
