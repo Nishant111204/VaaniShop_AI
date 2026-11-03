@@ -67,6 +67,7 @@ public class ShopService {
     var shop = findOwned(shopId, owner);
     var schema = new ShopSchema(
         orDefault(req.shopName(), shop.getShopName()),
+        "",
         orDefault(req.description(), ""),
         orDefault(req.category(), shop.getCategory()),
         orDefault(req.address(), ""),
@@ -177,7 +178,7 @@ public class ShopService {
       root.put("shopName", shopName == null ? "My Shop" : shopName);
       return objectMapper.treeToValue(root, ShopSchema.class);
     } catch (Exception e) {
-      return new ShopSchema(shopName == null ? "My Shop" : shopName, "", "", "", "", "", "", "", "", "", List.of());
+      return new ShopSchema(shopName == null ? "My Shop" : shopName, "", "", "", "", "", "", "", "", "", "", List.of());
     }
   }
 

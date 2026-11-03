@@ -4,6 +4,7 @@ import java.util.List;
 
 public record ShopSchema(
     String shopName,
+    String tagline,
     String description,
     String category,
     String address,
@@ -14,6 +15,6 @@ public record ShopSchema(
     String instagram,
     String theme,
     List<Product> products) {
-  public record Product(String name, String price, String description, String category) {
+  public record Product(String name, String price, String description, String category, String imageKeyword) {
   }
 }

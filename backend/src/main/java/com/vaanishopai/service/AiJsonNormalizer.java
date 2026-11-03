@@ -32,16 +32,17 @@ public class AiJsonNormalizer {
       throw new BadRequestException("AI returned non-object JSON");
     }
 
-    var shopName  = text(root, "shopName",  "My Shop");
+    var shopName    = text(root, "shopName",    "My Shop");
+    var tagline     = text(root, "tagline",     "");
     var description = text(root, "description", "");
-    var category  = text(root, "category",  "");
-    var address   = text(root, "address",   "");
-    var phone     = text(root, "phone",     "");
-    var whatsapp  = text(root, "whatsapp",  phone);
-    var email     = text(root, "email",     "");
-    var timing    = text(root, "timing",    "");
-    var instagram = text(root, "instagram", "");
-    var theme     = text(root, "theme",     "slate");
+    var category    = text(root, "category",    "");
+    var address     = text(root, "address",     "");
+    var phone       = text(root, "phone",       "");
+    var whatsapp    = text(root, "whatsapp",    phone);
+    var email       = text(root, "email",       "");
+    var timing      = text(root, "timing",      "");
+    var instagram   = text(root, "instagram",   "");
+    var theme       = text(root, "theme",       "slate");
 
     List<ShopSchema.Product> products = new ArrayList<>();
     var productsNode = root.get("products");
@@ -52,15 +53,18 @@ public class AiJsonNormalizer {
               text(p, "name", ""),
               text(p, "price", ""),
               text(p, "description", ""),
-              text(p, "category", "")
+              text(p, "category", ""),
+              text(p, "imageKeyword", "")
           ));
         }
       }
     }
 
-    var schema = new ShopSchema(shopName, description, category, address, phone, whatsapp, email, timing, instagram, theme, products);
+    var schema = new ShopSchema(shopName, tagline, description, category, address, phone, whatsapp, email, timing, instagram, theme, products);
 
     ObjectNode jsonb = objectMapper.createObjectNode();
+    jsonb.put("shopName", shopName);
+    jsonb.put("tagline", tagline);
     jsonb.put("description", description);
     jsonb.put("category", category);
     jsonb.put("address", address);
@@ -78,6 +82,7 @@ public class AiJsonNormalizer {
       obj.put("price", p.price() == null ? "" : p.price());
       obj.put("description", p.description() == null ? "" : p.description());
       obj.put("category", p.category() == null ? "" : p.category());
+      obj.put("imageKeyword", p.imageKeyword() == null ? "" : p.imageKeyword());
       prods.add(obj);
     }
     jsonb.set("products", prods);
