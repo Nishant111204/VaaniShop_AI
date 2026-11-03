@@ -2,10 +2,12 @@ import React, { useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { QRCodeCanvas, QRCodeSVG } from 'qrcode.react'
 import { Download, Printer } from 'lucide-react'
+import { useI18n } from '../i18n/index.jsx'
 
 /** The shop's QR code, with a high-resolution PNG download and a link to the printable poster. */
 export default function QrCard({ url, fileName = 'shop-qr', posterTo }) {
   const canvasRef = useRef(null)
+  const { t } = useI18n()
 
   function download() {
     const a = document.createElement('a')
@@ -21,12 +23,12 @@ export default function QrCard({ url, fileName = 'shop-qr', posterTo }) {
       </div>
       <QRCodeCanvas ref={canvasRef} value={url} size={1024} marginSize={4} fgColor="#141B3D" className="hidden" aria-hidden="true" />
       <div className="text-center sm:text-left">
-        <p className="text-lg font-semibold text-neel-900">Your QR code</p>
-        <p className="mt-1 text-neel-500">Customers scan it with their phone camera to open your page.</p>
+        <p className="text-lg font-semibold text-neel-900">{t('qr.title')}</p>
+        <p className="mt-1 text-neel-500">{t('qr.body')}</p>
         <div className="mt-4 flex flex-wrap justify-center gap-2 sm:justify-start">
-          <button type="button" onClick={download} className="btn-line btn-sm"><Download className="h-4 w-4" aria-hidden="true" /> Download QR</button>
+          <button type="button" onClick={download} className="btn-line btn-sm"><Download className="h-4 w-4" aria-hidden="true" /> {t('qr.download')}</button>
           {posterTo && (
-            <Link to={posterTo} className="btn-line btn-sm"><Printer className="h-4 w-4" aria-hidden="true" /> Print a counter poster</Link>
+            <Link to={posterTo} className="btn-line btn-sm"><Printer className="h-4 w-4" aria-hidden="true" /> {t('qr.poster')}</Link>
           )}
         </div>
       </div>

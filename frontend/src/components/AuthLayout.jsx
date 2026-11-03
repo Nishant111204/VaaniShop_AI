@@ -1,8 +1,10 @@
 import React from 'react'
 import AuthForm from './AuthForm.jsx'
+import { useI18n } from '../i18n/index.jsx'
 
 /** Shared frame for the sign-in and sign-up pages: a signboard panel beside the form. */
 export default function AuthLayout({ title, subtitle, signText, mode, onDone }) {
+  const { t } = useI18n()
   return (
     <div className="mx-auto grid max-w-5xl gap-8 px-4 py-10 sm:px-6 lg:grid-cols-2 lg:items-center lg:py-16">
       <div className="on-haldi hidden overflow-hidden rounded-[32px] bg-haldi lg:block">
@@ -10,7 +12,7 @@ export default function AuthLayout({ title, subtitle, signText, mode, onDone }) 
         <div className="px-10 pb-12 pt-16">
           <p className="sign text-6xl text-neel-900" lang="hi">{signText}</p>
           <p className="mt-6 max-w-sm text-xl text-neel-700">
-            Change prices, add photos and share your page from any phone, whenever you like.
+            {t('auth.panel')}
           </p>
         </div>
       </div>

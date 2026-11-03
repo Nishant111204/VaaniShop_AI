@@ -27,6 +27,10 @@ price list, WhatsApp ordering, opening hours, directions and a QR poster for the
 - **Rich link previews.** Shared shop links show the shop's own card (awning, name, tagline)
   in WhatsApp and social apps, and carry search-engine business data and a sitemap.
 - **Installable.** Shopkeepers can add VaaniShop to their phone's home screen.
+- **English or Hindi interface.** Owners switch with one tap (remembered per device; Hindi
+  is picked automatically on Hindi phones). Text lives in `frontend/src/i18n/en.js` and
+  `hi.js`; a test keeps their keys and placeholders in sync. Customer-facing shop pages
+  stay in the shop's own language.
 
 ## Stack
 

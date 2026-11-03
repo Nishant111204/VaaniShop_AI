@@ -15,7 +15,8 @@ function extensionFor(mime) {
 
 /**
  * Records from the microphone and reports a live input level (0–1) for visualising.
- * onAudio(blob, extension) is called once recording stops normally.
+ * onAudio(blob, extension) is called once recording stops normally; onError gets a code:
+ * "unsupported", "blocked" (microphone permission) or "short".
  */
 export function useVoiceRecorder({ onAudio, maxSeconds = 120, onError }) {
   const [recording, setRecording] = useState(false)
@@ -52,14 +53,14 @@ export function useVoiceRecorder({ onAudio, maxSeconds = 120, onError }) {
 
   const start = useCallback(async () => {
     if (!supported) {
-      onError?.('This browser cannot record audio. Please type your shop details instead.')
+      onError?.('unsupported')
       return
     }
     let stream
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } })
     } catch {
-      onError?.('Microphone access was blocked. Allow the microphone in your browser settings, or type instead.')
+      onError?.('blocked')
       return
     }
     streamRef.current = stream
@@ -97,7 +98,7 @@ export function useVoiceRecorder({ onAudio, maxSeconds = 120, onError }) {
       const blob = new Blob(chunksRef.current, { type })
       chunksRef.current = []
       if (Date.now() - startedAtRef.current < 1200 || blob.size < 1000) {
-        onError?.('That was too short. Tap the mic and speak for a few seconds.')
+        onError?.('short')
         return
       }
       onAudioRef.current?.(blob, extensionFor(type))

@@ -2,6 +2,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { ArrowDown, ArrowUp, Eye, MessageCircle, Navigation, Phone, Share2, ShoppingBasket, Table2 } from 'lucide-react'
 import Spinner from './Spinner.jsx'
 import { getShopStats } from '../lib/api.js'
+import { useI18n } from '../i18n/index.jsx'
 
 // Mid step of the indigo ramp: passes the chart palette checks against white (dataviz validator).
 const BAR = '#5A67A6'
@@ -9,34 +10,35 @@ const BAR_ACTIVE = '#2F3C7E'
 const CHART_DAYS = 14
 
 const KPIS = [
-  { key: 'visits', label: 'Visits', icon: Eye },
-  { key: 'orders', label: 'WhatsApp orders', icon: ShoppingBasket },
-  { key: 'whatsapp', label: 'WhatsApp chats', icon: MessageCircle },
-  { key: 'calls', label: 'Calls', icon: Phone },
-  { key: 'directions', label: 'Directions', icon: Navigation },
-  { key: 'shares', label: 'Shares', icon: Share2 },
+  { key: 'visits', icon: Eye },
+  { key: 'orders', icon: ShoppingBasket },
+  { key: 'whatsapp', icon: MessageCircle },
+  { key: 'calls', icon: Phone },
+  { key: 'directions', icon: Navigation },
+  { key: 'shares', icon: Share2 },
 ]
 
 function sum(days, key) {
   return days.reduce((n, d) => n + d[key], 0)
 }
 
-function dayLabel(iso, opts) {
-  return new Date(`${iso}T00:00:00`).toLocaleDateString('en-IN', opts)
+function dayLabel(iso, opts, lang) {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString(lang === 'hi' ? 'hi-IN' : 'en-IN', opts)
 }
 
 /** What customers did on the shop page: last-7-day totals against the week before, and daily visits. */
 export default function Insights({ shopId, onShare }) {
+  const { t } = useI18n()
   const [days, setDays] = useState(null)
   const [error, setError] = useState('')
   const [table, setTable] = useState(false)
 
   useEffect(() => {
-    getShopStats(shopId, 30).then(r => setDays(r.days)).catch(e => setError(e.message || 'Could not load insights'))
+    getShopStats(shopId, 30).then(r => setDays(r.days)).catch(e => setError(e.message || t('ins.loadErr')))
   }, [shopId])
 
   if (error) return <p className="rounded-2xl bg-sindoor-soft px-4 py-3 text-sindoor-deep">{error}</p>
-  if (!days) return <Spinner label="Loading insights…" className="py-12" />
+  if (!days) return <Spinner label={t('ins.loading')} className="py-12" />
 
   const thisWeek = days.slice(-7)
   const lastWeek = days.slice(-14, -7)
@@ -46,11 +48,11 @@ export default function Insights({ shopId, onShare }) {
   if (!anything) {
     return (
       <div className="panel p-6 text-center sm:p-8">
-        <h2 className="text-xl font-semibold text-neel-900">No visits yet</h2>
+        <h2 className="text-xl font-semibold text-neel-900">{t('ins.emptyTitle')}</h2>
         <p className="mx-auto mt-1 max-w-sm text-neel-500">
-          Share your link in your WhatsApp groups and put the QR poster on your counter. Visits and orders will show up here.
+          {t('ins.emptyBody')}
         </p>
-        {onShare && <button type="button" onClick={onShare} className="btn-ink mt-5">Share my shop</button>}
+        {onShare && <button type="button" onClick={onShare} className="btn-ink mt-5">{t('ins.shareShop')}</button>}
       </div>
     )
   }
@@ -58,7 +60,7 @@ export default function Insights({ shopId, onShare }) {
   return (
     <div className="grid gap-6">
       <section aria-labelledby="week-title">
-        <h2 id="week-title" className="text-lg font-semibold text-neel-900">Last 7 days</h2>
+        <h2 id="week-title" className="text-lg font-semibold text-neel-900">{t('ins.lastWeek')}</h2>
         <ul className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
           {KPIS.map(k => {
             const now = sum(thisWeek, k.key)
@@ -66,7 +68,7 @@ export default function Insights({ shopId, onShare }) {
             return (
               <li key={k.key} className="panel p-4">
                 <p className="flex items-center gap-1.5 text-sm font-medium text-neel-500">
-                  <k.icon className="h-4 w-4" aria-hidden="true" /> {k.label}
+                  <k.icon className="h-4 w-4" aria-hidden="true" /> {t(`ins.${k.key}`)}
                 </p>
                 <p className="mt-1 text-3xl font-semibold text-neel-900">{now.toLocaleString('en-IN')}</p>
                 <Delta now={now} before={before} />
@@ -78,9 +80,9 @@ export default function Insights({ shopId, onShare }) {
 
       <section aria-labelledby="daily-title" className="panel p-5 sm:p-6">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 id="daily-title" className="text-lg font-semibold text-neel-900">Visits per day</h2>
+          <h2 id="daily-title" className="text-lg font-semibold text-neel-900">{t('ins.perDay')}</h2>
           <button type="button" onClick={() => setTable(t => !t)} aria-pressed={table} className="btn-ghost btn-sm -mr-2">
-            <Table2 className="h-4 w-4" aria-hidden="true" /> {table ? 'Show chart' : 'Show as table'}
+            <Table2 className="h-4 w-4" aria-hidden="true" /> {table ? t('ins.showChart') : t('ins.showTable')}
           </button>
         </div>
         {table ? <DailyTable days={recent} /> : <VisitsChart days={recent} />}
@@ -90,13 +92,14 @@ export default function Insights({ shopId, onShare }) {
 }
 
 function Delta({ now, before }) {
-  if (now === before) return <p className="mt-0.5 text-sm text-neel-500">Same as the week before</p>
+  const { t } = useI18n()
+  if (now === before) return <p className="mt-0.5 text-sm text-neel-500">{t('ins.same')}</p>
   const up = now > before
   const Icon = up ? ArrowUp : ArrowDown
   return (
     <p className={`mt-0.5 flex items-center gap-1 text-sm font-medium ${up ? 'text-paan-deep' : 'text-sindoor-deep'}`}>
       <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-      {up ? '+' : '−'}{Math.abs(now - before)} vs the week before
+      {t('ins.delta', { change: `${up ? '+' : '−'}${Math.abs(now - before)}` })}
     </p>
   )
 }
@@ -109,6 +112,7 @@ function niceMax(v) {
 }
 
 function VisitsChart({ days }) {
+  const { t, lang } = useI18n()
   const box = useRef(null)
   const [width, setWidth] = useState(600)
   const [active, setActive] = useState(null)
@@ -133,7 +137,7 @@ function VisitsChart({ days }) {
 
   return (
     <div ref={box} className="relative mt-4" onPointerLeave={() => setActive(null)}>
-      <svg width={width} height={height} role="img" aria-label={`Visits per day for the last ${days.length} days. Use Show as table for exact numbers.`}>
+      <svg width={width} height={height} role="img" aria-label={t('ins.chartLabel', { n: days.length })}>
         {ticks.map(t => (
           <g key={t}>
             <line x1={pad.left} x2={pad.left + plotW} y1={y(t)} y2={y(t)} stroke="#E8EBF6" strokeWidth="1" />
@@ -155,7 +159,7 @@ function VisitsChart({ days }) {
             <g key={d.day}>
               {path && <path d={path} fill={active === i ? BAR_ACTIVE : BAR} />}
               {showLabel && (
-                <text x={cx} y={height - 8} textAnchor="middle" fontSize="12" fill="#5A67A6">{dayLabel(d.day, { day: 'numeric' })}</text>
+                <text x={cx} y={height - 8} textAnchor="middle" fontSize="12" fill="#5A67A6">{dayLabel(d.day, { day: 'numeric' }, lang)}</text>
               )}
               {/* The whole column is the hit target, so short bars are easy to hover and tap. */}
               <rect
@@ -166,7 +170,7 @@ function VisitsChart({ days }) {
                 fill="transparent"
                 tabIndex={0}
                 role="img"
-                aria-label={`${dayLabel(d.day, { weekday: 'long', day: 'numeric', month: 'long' })}: ${d.visits} visits, ${d.orders} orders`}
+                aria-label={t('ins.barLabel', { day: dayLabel(d.day, { weekday: 'long', day: 'numeric', month: 'long' }, lang), visits: d.visits, orders: d.orders })}
                 onPointerEnter={() => setActive(i)}
                 onFocus={() => setActive(i)}
                 onBlur={() => setActive(null)}
@@ -189,9 +193,9 @@ function VisitsChart({ days }) {
             transform: 'translate(-50%, -100%)',
           }}
         >
-          <p className="text-white/70">{dayLabel(hovered.day, { weekday: 'short', day: 'numeric', month: 'short' })}</p>
-          <p><strong className="text-base">{hovered.visits}</strong> visits</p>
-          <p><strong>{hovered.orders}</strong> orders, <strong>{hovered.calls}</strong> calls</p>
+          <p className="text-white/70">{dayLabel(hovered.day, { weekday: 'short', day: 'numeric', month: 'short' }, lang)}</p>
+          <p><strong className="text-base">{hovered.visits}</strong> {t('ins.tipVisits')}</p>
+          <p>{t('ins.tipOrdersCalls', { orders: hovered.orders, calls: hovered.calls })}</p>
         </div>
       )}
     </div>
@@ -199,19 +203,20 @@ function VisitsChart({ days }) {
 }
 
 function DailyTable({ days }) {
+  const { t, lang } = useI18n()
   return (
     <div className="mt-4 overflow-x-auto">
       <table className="w-full min-w-[32rem] text-left text-sm">
         <thead className="text-neel-500">
           <tr className="border-b border-neel-100">
-            <th scope="col" className="py-2 pr-3 font-medium">Day</th>
-            {KPIS.map(k => <th key={k.key} scope="col" className="px-2 py-2 text-right font-medium">{k.label}</th>)}
+            <th scope="col" className="py-2 pr-3 font-medium">{t('ins.day')}</th>
+            {KPIS.map(k => <th key={k.key} scope="col" className="px-2 py-2 text-right font-medium">{t(`ins.${k.key}`)}</th>)}
           </tr>
         </thead>
         <tbody className="tabular-nums">
           {[...days].reverse().map(d => (
             <tr key={d.day} className="border-b border-neel-50 last:border-0">
-              <th scope="row" className="py-2 pr-3 font-medium text-neel-900">{dayLabel(d.day, { weekday: 'short', day: 'numeric', month: 'short' })}</th>
+              <th scope="row" className="py-2 pr-3 font-medium text-neel-900">{dayLabel(d.day, { weekday: 'short', day: 'numeric', month: 'short' }, lang)}</th>
               {KPIS.map(k => <td key={k.key} className="px-2 py-2 text-right text-neel-700">{d[k.key]}</td>)}
             </tr>
           ))}

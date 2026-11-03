@@ -3,6 +3,7 @@ import toast from 'react-hot-toast'
 import { Mic, Square } from 'lucide-react'
 import { useVoiceRecorder } from '../lib/useVoiceRecorder.js'
 import { getSpeechLanguage, setSpeechLanguage } from '../lib/storage.js'
+import { useI18n } from '../i18n/index.jsx'
 
 export const LANGUAGES = [
   { code: null, label: 'Any language', name: 'Detect automatically' },
@@ -29,10 +30,11 @@ function clock(s) {
  * "md" inside panels.
  */
 export default function VoiceCapture({ onAudio, disabled = false, size = 'lg', showLanguages = true, idleLabel, layout = 'column' }) {
+  const { t } = useI18n()
   const [language, setLanguage] = useState(getSpeechLanguage)
   const { recording, seconds, level, start, stop } = useVoiceRecorder({
     onAudio: (blob, ext) => onAudio(blob, language, ext),
-    onError: msg => toast.error(msg),
+    onError: code => toast.error(t(`voice.err.${code}`)),
   })
 
   function chooseLanguage(code) {
@@ -48,7 +50,7 @@ export default function VoiceCapture({ onAudio, disabled = false, size = 'lg', s
     <div className={row ? 'flex items-center gap-6' : 'flex flex-col items-center gap-6'}>
       {showLanguages && (
         <div className="w-full">
-          <p id="speak-language" className="sr-only">Language you will speak in</p>
+          <p id="speak-language" className="sr-only">{t('voice.languageLabel')}</p>
           <div
             role="radiogroup"
             aria-labelledby="speak-language"
@@ -68,7 +70,7 @@ export default function VoiceCapture({ onAudio, disabled = false, size = 'lg', s
                   onClick={() => chooseLanguage(l.code)}
                   className={`${active ? 'chip-on' : 'chip-off'} disabled:opacity-60`}
                 >
-                  {l.label}
+                  {l.code ? l.label : t('voice.anyLanguage')}
                 </button>
               )
             })}
@@ -96,7 +98,7 @@ export default function VoiceCapture({ onAudio, disabled = false, size = 'lg', s
           onClick={recording ? stop : start}
           disabled={disabled}
           aria-pressed={recording}
-          aria-label={recording ? 'Stop recording' : 'Start recording'}
+          aria-label={recording ? t('voice.stop') : t('voice.start')}
           className={`mic-orb relative grid h-full w-full place-items-center rounded-full text-white transition-transform active:scale-95 disabled:grayscale disabled:opacity-60`}
         >
           {recording ? <Square className={`${icon} fill-white`} strokeWidth={0} /> : <Mic className={icon} strokeWidth={2.2} />}
@@ -106,13 +108,13 @@ export default function VoiceCapture({ onAudio, disabled = false, size = 'lg', s
       <div className={`min-h-[3.25rem] ${row ? 'text-left' : 'text-center'}`} aria-live="polite">
         {recording ? (
           <>
-            <p className="text-lg font-semibold tabular-nums text-sindoor">Listening {clock(seconds)}</p>
-            <p className="text-sm text-neel-500">Tap the button again when you have finished</p>
+            <p className="text-lg font-semibold tabular-nums text-sindoor">{t('voice.listening', { time: clock(seconds) })}</p>
+            <p className="text-sm text-neel-500">{t('voice.tapAgain')}</p>
           </>
         ) : (
           <>
-            <p className="text-lg font-semibold text-neel">{idleLabel || 'Tap the mic and speak'}</p>
-            <p className="text-sm text-neel-500" lang="hi">माइक दबाइए और बोलिए</p>
+            <p className="text-lg font-semibold text-neel">{idleLabel || t('voice.tapToSpeak')}</p>
+            {t('voice.tapToSpeakAlt') && <p className="text-sm text-neel-500" lang="hi">{t('voice.tapToSpeakAlt')}</p>}
           </>
         )}
       </div>

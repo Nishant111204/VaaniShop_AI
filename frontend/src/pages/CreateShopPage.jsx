@@ -18,13 +18,14 @@ import { generateShop, publishShop, transcribeAudio } from '../lib/api.js'
 import { takePendingInput } from '../lib/pendingInput.js'
 import { clearDraft, loadDraft, saveDraft } from '../lib/storage.js'
 import { getTheme, shopPath, shopUrl, shareText, whatsappShareLink } from '../lib/shop.js'
+import { LanguageToggle, useI18n } from '../i18n/index.jsx'
 
 const MENTION = [
-  { icon: Store, text: 'Shop name' },
-  { icon: IndianRupee, text: 'Items and prices' },
-  { icon: Clock, text: 'Opening hours' },
-  { icon: MapPin, text: 'Area and city' },
-  { icon: MessageCircle, text: 'WhatsApp number' },
+  { icon: Store, key: 'create.mention.name' },
+  { icon: IndianRupee, key: 'create.mention.items' },
+  { icon: Clock, key: 'create.mention.hours' },
+  { icon: MapPin, key: 'create.mention.area' },
+  { icon: MessageCircle, key: 'create.mention.whatsapp' },
 ]
 
 const EXAMPLES = [
@@ -48,6 +49,7 @@ const EXAMPLES = [
 export default function CreateShopPage() {
   const nav = useNavigate()
   const { isAuthenticated } = useAuth()
+  const { t } = useI18n()
   const [params] = useSearchParams()
   const [stage, setStage] = useState('input') // input | working | preview | published
   const [mode, setMode] = useState(params.get('mode') === 'type' ? 'type' : 'voice')
@@ -88,12 +90,12 @@ export default function CreateShopPage() {
       const res = await transcribeAudio(blob, language, extension)
       heard = (res.text || '').trim()
     } catch (e) {
-      toast.error(e.message || 'Could not understand the recording. Try again.')
+      toast.error(e.message || t('create.err.understand'))
       setStage('input')
       return
     }
     if (!heard) {
-      toast.error('We could not hear any words. Try again somewhere quieter, or type instead.')
+      toast.error(t('create.err.noWords'))
       setStage('input')
       return
     }
@@ -104,7 +106,7 @@ export default function CreateShopPage() {
   async function fromText(value) {
     const trimmed = value.trim()
     if (trimmed.length < 15) {
-      toast.error('Tell us a little more: your shop name and a few items with prices.')
+      toast.error(t('create.err.tooShort'))
       return
     }
     setStage('working')
@@ -120,7 +122,7 @@ export default function CreateShopPage() {
       saveDraft(shop)
       setStage('preview')
     } catch (e) {
-      toast.error(e.message || 'Could not build the page. Try again.')
+      toast.error(e.message || t('create.err.build'))
       // Keep what they said, so trying again doesn't mean repeating themselves.
       setText(description)
       setMode('type')
@@ -152,7 +154,7 @@ export default function CreateShopPage() {
       setPublished(res)
       setStage('published')
     } catch (e) {
-      toast.error(e.message || 'Could not publish. Try again.')
+      toast.error(e.message || t('create.err.publish'))
     } finally {
       setPublishing(false)
     }
@@ -169,9 +171,13 @@ export default function CreateShopPage() {
     <div className={`min-h-dvh ${stage === 'input' || stage === 'working' ? 'on-haldi bg-haldi' : 'bg-neel-50'}`}>
       <header className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
         <Logo />
-        <Link to={isAuthenticated ? '/dashboard' : '/'} className="btn-ghost btn-sm">
-          <ArrowLeft className="h-4 w-4" aria-hidden="true" /> {isAuthenticated ? 'My shops' : 'Home'}
-        </Link>
+        <div className="flex items-center gap-2">
+          <LanguageToggle />
+          <Link to={isAuthenticated ? '/dashboard' : '/'} className="btn-ghost btn-sm" aria-label={isAuthenticated ? t('nav.myShops') : t('nav.home')}>
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            <span className="hidden sm:inline">{isAuthenticated ? t('nav.myShops') : t('nav.home')}</span>
+          </Link>
+        </div>
       </header>
 
       {stage === 'input' && (
@@ -192,9 +198,9 @@ export default function CreateShopPage() {
 
       <Modal open={authOpen} onClose={() => setAuthOpen(false)} labelledBy="save-title">
         <div className="p-6 sm:p-8">
-          <h2 id="save-title" className="text-2xl font-bold text-neel-900 condensed">Save your shop page</h2>
-          <p className="mb-6 mt-1 text-neel-500">Use your mobile number. You will sign in with it to change prices and add photos later.</p>
-          <AuthForm onDone={publish} submitLabel="Continue and publish" />
+          <h2 id="save-title" className="text-2xl font-bold text-neel-900 condensed">{t('create.save.title')}</h2>
+          <p className="mb-6 mt-1 text-neel-500">{t('create.save.body')}</p>
+          <AuthForm onDone={publish} submitLabel={t('create.save.submit')} />
         </div>
       </Modal>
     </div>
@@ -202,15 +208,16 @@ export default function CreateShopPage() {
 }
 
 function InputStage({ mode, setMode, text, setText, onAudio, onText }) {
+  const { t } = useI18n()
   return (
     <section className="mx-auto max-w-2xl px-4 pb-16 pt-6 text-center sm:pt-10">
-      <h1 className="sign text-[clamp(2.4rem,7vw,4rem)] text-neel-900">Tell us about your shop</h1>
-      <p className="mt-2 text-xl text-neel-700" lang="hi">अपनी दुकान के बारे में बताइए</p>
+      <h1 className="sign text-[clamp(2.4rem,7vw,4rem)] text-neel-900">{t('create.title')}</h1>
+      {t('create.titleAlt') && <p className="mt-2 text-xl text-neel-700" lang="hi">{t('create.titleAlt')}</p>}
 
-      <div role="tablist" aria-label="How to describe your shop" className="mx-auto mt-8 inline-flex rounded-2xl bg-neel/10 p-1">
+      <div role="tablist" aria-label={t('create.howTo')} className="mx-auto mt-8 inline-flex rounded-2xl bg-neel/10 p-1">
         {[
-          { key: 'voice', label: 'Speak', icon: Mic },
-          { key: 'type', label: 'Type', icon: Keyboard },
+          { key: 'voice', label: t('create.speak'), icon: Mic },
+          { key: 'type', label: t('create.type'), icon: Keyboard },
         ].map(t => (
           <button key={t.key} role="tab" type="button" aria-selected={mode === t.key} onClick={() => setMode(t.key)}
             className={`flex items-center gap-2 rounded-xl px-5 py-2.5 font-semibold transition-colors ${mode === t.key ? 'bg-white text-neel shadow-sm' : 'text-neel-700 hover:text-neel'}`}>
@@ -224,35 +231,35 @@ function InputStage({ mode, setMode, text, setText, onAudio, onText }) {
           <VoiceCapture onAudio={onAudio} />
         ) : (
           <div className="text-left">
-            <label htmlFor="describe" className="sr-only">Describe your shop</label>
+            <label htmlFor="describe" className="sr-only">{t('create.describe')}</label>
             <textarea
               id="describe"
               value={text}
               onChange={e => setText(e.target.value)}
               rows={6}
               maxLength={4000}
-              placeholder="Example: Sharma Kirana Store in Kothrud, Pune. Rice ₹60/kg, toor dal ₹120/kg. Open 8 AM to 10 PM. WhatsApp 98765 43210."
+              placeholder={t('create.placeholder')}
               className="field resize-y rounded-2xl border-0 p-4 text-lg leading-relaxed shadow-lift"
             />
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              <span className="text-sm font-medium text-neel-700">Try an example:</span>
+              <span className="text-sm font-medium text-neel-700">{t('create.tryExample')}</span>
               {EXAMPLES.map(ex => (
                 <button key={ex.label} type="button" onClick={() => setText(ex.text)} className="chip-off" lang={ex.lang}>{ex.label}</button>
               ))}
             </div>
             <button type="button" onClick={onText} disabled={!text.trim()} className="btn-ink mt-6 w-full py-4 text-lg">
-              Build my shop page
+              {t('create.build')}
             </button>
           </div>
         )}
       </div>
 
       <div className="mx-auto mt-12 max-w-xl rounded-3xl bg-white/60 p-5 text-left">
-        <h2 className="font-semibold text-neel-900">Mention these, in any order</h2>
+        <h2 className="font-semibold text-neel-900">{t('create.mentionTitle')}</h2>
         <ul className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2.5 sm:grid-cols-3">
           {MENTION.map(m => (
-            <li key={m.text} className="flex items-center gap-2 text-neel-700">
-              <m.icon className="h-4 w-4 shrink-0 text-sindoor" aria-hidden="true" /> {m.text}
+            <li key={m.key} className="flex items-center gap-2 text-neel-700">
+              <m.icon className="h-4 w-4 shrink-0 text-sindoor" aria-hidden="true" /> {t(m.key)}
             </li>
           ))}
         </ul>
@@ -262,20 +269,21 @@ function InputStage({ mode, setMode, text, setText, onAudio, onText }) {
 }
 
 function WorkingStage({ step, transcript, fromVoice }) {
+  const { t } = useI18n()
   const steps = [
-    fromVoice && { key: 'transcribing', label: 'Turning your voice into text' },
-    { key: 'generating', label: 'Writing your shop page' },
+    fromVoice && { key: 'transcribing', label: t('create.step.transcribing') },
+    { key: 'generating', label: t('create.step.generating') },
   ].filter(Boolean)
   const currentIndex = steps.findIndex(s => s.key === step)
 
   return (
     <section className="mx-auto max-w-xl px-4 pb-16 pt-10" aria-live="polite">
-      <h1 className="sign text-center text-[clamp(2.2rem,6vw,3.4rem)] text-neel-900">Building your shop</h1>
+      <h1 className="sign text-center text-[clamp(2.2rem,6vw,3.4rem)] text-neel-900">{t('create.building')}</h1>
 
       {transcript && (
         <figure className="rise mt-8 rounded-[24px] rounded-bl-md bg-white p-5 shadow-lift">
           <figcaption className="mb-2 flex items-center gap-2 text-sm font-semibold text-neel-500">
-            <AudioLines className="h-4 w-4 text-sindoor" aria-hidden="true" /> {fromVoice ? 'We heard' : 'You wrote'}
+            <AudioLines className="h-4 w-4 text-sindoor" aria-hidden="true" /> {fromVoice ? t('create.heard') : t('create.wrote')}
           </figcaption>
           <blockquote className="text-lg leading-relaxed text-neel-900">{transcript}</blockquote>
         </figure>
@@ -300,6 +308,7 @@ function WorkingStage({ step, transcript, fromVoice }) {
 }
 
 function PreviewStage({ draft, update, onPublish, publishing, onStartOver }) {
+  const { t } = useI18n()
   // Fixed at first render so rows don't jump around as the owner ticks and unticks.
   const [reviewable] = useState(() => (draft.products || []).filter(p => p.suggested))
 
@@ -314,28 +323,28 @@ function PreviewStage({ draft, update, onPublish, publishing, onStartOver }) {
           <PhoneFrame responsive>
             <ShopSite data={draft} showSuggested />
           </PhoneFrame>
-          <p className="mt-3 text-center text-sm text-neel-500">This is how customers will see it. Scroll to see more.</p>
+          <p className="mt-3 text-center text-sm text-neel-500">{t('create.previewNote')}</p>
         </div>
       </div>
 
       <div className="lg:order-1 lg:pt-6">
-        <h1 className="sign text-[clamp(2.2rem,5vw,3.5rem)] text-neel-900">Your shop page is ready</h1>
-        <p className="mt-2 max-w-prose text-lg text-neel-700">Check the details below, then publish to get your link and QR code.</p>
+        <h1 className="sign text-[clamp(2.2rem,5vw,3.5rem)] text-neel-900">{t('create.ready')}</h1>
+        <p className="mt-2 max-w-prose text-lg text-neel-700">{t('create.readySub')}</p>
 
         <div className="panel mt-8 p-5 sm:p-6">
-          <h2 className="flex items-center gap-2 text-lg font-semibold"><Pencil className="h-4 w-4 text-sindoor" aria-hidden="true" /> Check the important details</h2>
+          <h2 className="flex items-center gap-2 text-lg font-semibold"><Pencil className="h-4 w-4 text-sindoor" aria-hidden="true" /> {t('create.checkDetails')}</h2>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <Field label="Shop name" value={draft.shopName} onChange={v => update({ shopName: v })} />
-            <Field label="WhatsApp number" value={draft.whatsapp} onChange={v => update({ whatsapp: v })} type="tel" inputMode="tel" />
-            <Field label="Area and city" value={draft.address} onChange={v => update({ address: v })} placeholder="Kothrud, Pune" />
-            <Field label="Opening hours" value={draft.timing} onChange={v => update({ timing: v })} />
+            <Field id="f-shop-name" label={t('create.f.shopName')} value={draft.shopName} onChange={v => update({ shopName: v })} />
+            <Field id="f-whatsapp" label={t('create.f.whatsapp')} value={draft.whatsapp} onChange={v => update({ whatsapp: v })} type="tel" inputMode="tel" />
+            <Field id="f-area" label={t('create.f.area')} value={draft.address} onChange={v => update({ address: v })} placeholder="Kothrud, Pune" />
+            <Field id="f-hours" label={t('create.f.hours')} value={draft.timing} onChange={v => update({ timing: v })} />
           </div>
         </div>
 
         {reviewable.length > 0 && (
           <div className="panel mt-4 p-5 sm:p-6">
-            <h2 className="text-lg font-semibold">We added {reviewable.length} items shops like yours often sell</h2>
-            <p className="mt-1 text-neel-500">Untick anything you don’t sell. You can change prices after publishing.</p>
+            <h2 className="text-lg font-semibold">{t('create.suggestedTitle', { n: reviewable.length })}</h2>
+            <p className="mt-1 text-neel-500">{t('create.suggestedBody')}</p>
             <ul className="mt-4 grid gap-2 sm:grid-cols-2">
               {reviewable.map((p, i) => {
                 const keep = draft.products.includes(p)
@@ -357,7 +366,7 @@ function PreviewStage({ draft, update, onPublish, publishing, onStartOver }) {
         )}
 
         <div className="panel mt-4 p-5 sm:p-6">
-          <h2 id="colour-label" className="text-lg font-semibold">Colour</h2>
+          <h2 id="colour-label" className="text-lg font-semibold">{t('create.colour')}</h2>
           <div className="mt-4">
             <ThemePicker value={draft.theme} onChange={theme => update({ theme })} labelledBy="colour-label" />
           </div>
@@ -366,11 +375,11 @@ function PreviewStage({ draft, update, onPublish, publishing, onStartOver }) {
         <div className="fixed inset-x-0 bottom-0 z-30 border-t border-neel-100 bg-white/95 px-4 pb-safe pt-3 backdrop-blur lg:static lg:mt-8 lg:border-0 lg:bg-transparent lg:p-0">
           <div className="mx-auto flex max-w-6xl flex-col-reverse gap-2 sm:flex-row lg:max-w-none">
             <button type="button" onClick={onStartOver} className="btn-ghost">
-              <RotateCcw className="h-4 w-4" aria-hidden="true" /> Start again
+              <RotateCcw className="h-4 w-4" aria-hidden="true" /> {t('create.startAgain')}
             </button>
             <button type="button" onClick={onPublish} disabled={publishing} className="btn-ink flex-1 py-4 text-lg sm:flex-none sm:px-10">
               {publishing ? <Loader2 className="h-5 w-5 spin-slow" aria-hidden="true" /> : <Check className="h-5 w-5" aria-hidden="true" />}
-              Publish my shop page
+              {t('create.publish')}
             </button>
           </div>
         </div>
@@ -379,8 +388,7 @@ function PreviewStage({ draft, update, onPublish, publishing, onStartOver }) {
   )
 }
 
-function Field({ label, value, onChange, ...rest }) {
-  const id = `f-${label.replace(/\s+/g, '-').toLowerCase()}`
+function Field({ id, label, value, onChange, ...rest }) {
   return (
     <div>
       <label htmlFor={id} className="field-label">{label}</label>
@@ -390,6 +398,7 @@ function Field({ label, value, onChange, ...rest }) {
 }
 
 function PublishedStage({ shop, onManage }) {
+  const { t } = useI18n()
   const url = shopUrl(shop)
   const d = shop.data
 
@@ -399,23 +408,23 @@ function PublishedStage({ shop, onManage }) {
         <div className="awning" style={{ '--awning': getTheme(d.theme).awning }} />
         <div className="px-6 pb-8 pt-12 text-center sm:px-10">
           <p className="inline-flex items-center gap-2 rounded-full bg-paan-soft px-3 py-1 font-semibold text-paan-deep">
-            <CircleCheck className="h-4 w-4" aria-hidden="true" /> Your shop is online
+            <CircleCheck className="h-4 w-4" aria-hidden="true" /> {t('create.online')}
           </p>
           <h1 className="sign mt-4 break-words text-[clamp(2.4rem,8vw,4rem)] text-neel-900">{d.shopName}</h1>
 
           <div className="mt-6 flex items-center gap-2 rounded-2xl border border-neel-100 bg-neel-50 p-1.5 pl-4 text-left">
             <span className="min-w-0 flex-1 truncate font-medium text-neel-700">{url.replace(/^https?:\/\//, '')}</span>
-            <button type="button" onClick={() => { navigator.clipboard?.writeText(url); toast.success('Link copied') }} className="btn-line btn-sm shrink-0">
-              <Copy className="h-4 w-4" aria-hidden="true" /> Copy
+            <button type="button" onClick={() => { navigator.clipboard?.writeText(url); toast.success(t('common.linkCopied')) }} className="btn-line btn-sm shrink-0">
+              <Copy className="h-4 w-4" aria-hidden="true" /> {t('common.copy')}
             </button>
           </div>
 
           <div className="mt-4 grid gap-2 sm:grid-cols-2">
             <a href={whatsappShareLink(shareText(d.shopName, url))} target="_blank" rel="noreferrer" className="btn-paan py-4">
-              <MessageCircle className="h-5 w-5" aria-hidden="true" /> Share on WhatsApp
+              <MessageCircle className="h-5 w-5" aria-hidden="true" /> {t('common.shareWhatsApp')}
             </a>
             <a href={shopPath(shop)} target="_blank" rel="noreferrer" className="btn-line py-4">
-              <ExternalLink className="h-5 w-5" aria-hidden="true" /> Open my page
+              <ExternalLink className="h-5 w-5" aria-hidden="true" /> {t('create.openPage')}
             </a>
           </div>
         </div>
@@ -426,10 +435,10 @@ function PublishedStage({ shop, onManage }) {
 
       <div className="mt-6 rounded-3xl bg-white p-5 text-center sm:flex sm:items-center sm:justify-between sm:text-left">
         <div>
-          <p className="font-semibold text-neel-900">Add photos, change prices, or update by voice</p>
-          <p className="text-neel-500">Your page updates the moment you save.</p>
+          <p className="font-semibold text-neel-900">{t('create.nextTitle')}</p>
+          <p className="text-neel-500">{t('create.nextBody')}</p>
         </div>
-        <button type="button" onClick={onManage} className="btn-ink mt-4 sm:mt-0">Edit my shop</button>
+        <button type="button" onClick={onManage} className="btn-ink mt-4 sm:mt-0">{t('create.editShop')}</button>
       </div>
     </section>
   )

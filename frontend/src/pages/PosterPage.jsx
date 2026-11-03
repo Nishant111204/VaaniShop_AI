@@ -6,17 +6,19 @@ import { ArrowLeft, MessageCircle, Printer } from 'lucide-react'
 import Spinner from '../components/Spinner.jsx'
 import { getOwnedShop } from '../lib/api.js'
 import { categoryEmoji, getTheme, shopUrl } from '../lib/shop.js'
+import { useI18n } from '../i18n/index.jsx'
 
 /** An A4 poster with the shop's QR code, for sticking on the counter or shutter. */
 export default function PosterPage() {
   const { id } = useParams()
   const [shop, setShop] = useState(null)
+  const { t: tr } = useI18n()
 
   useEffect(() => {
     getOwnedShop(id).then(setShop).catch(e => toast.error(e.message || 'Could not load shop'))
   }, [id])
 
-  if (!shop) return <Spinner label="Preparing poster…" className="min-h-dvh" />
+  if (!shop) return <Spinner label={tr('poster.preparing')} className="min-h-dvh" />
 
   const d = shop.data
   const t = getTheme(d.theme)
@@ -26,8 +28,8 @@ export default function PosterPage() {
   return (
     <div className="min-h-dvh bg-neel-100 py-6 print:bg-white print:p-0">
       <div className="no-print mx-auto mb-5 flex max-w-[210mm] items-center justify-between gap-3 px-4">
-        <Link to={`/manage/${id}`} className="btn-line btn-sm"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Back to shop</Link>
-        <button type="button" onClick={() => window.print()} className="btn-ink btn-sm"><Printer className="h-4 w-4" aria-hidden="true" /> Print poster</button>
+        <Link to={`/manage/${id}`} className="btn-line btn-sm"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> {tr('poster.back')}</Link>
+        <button type="button" onClick={() => window.print()} className="btn-ink btn-sm"><Printer className="h-4 w-4" aria-hidden="true" /> {tr('poster.print')}</button>
       </div>
 
       <article
@@ -62,7 +64,7 @@ export default function PosterPage() {
           </div>
         </div>
       </article>
-      <p className="no-print mt-4 text-center text-sm text-neel-500">Prints on one A4 sheet. Laminate it to keep it fresh.</p>
+      <p className="no-print mt-4 text-center text-sm text-neel-500">{tr('poster.note')}</p>
     </div>
   )
 }

@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import { LogOut, Menu, Mic, X } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import Logo from './Logo.jsx'
+import { LanguageToggle, useI18n } from '../i18n/index.jsx'
 
 function navClass({ isActive }) {
   return `rounded-xl px-3 py-2 text-[15px] font-semibold transition-colors ${isActive ? 'text-neel' : 'text-neel-500 hover:text-neel'}`
@@ -11,6 +12,7 @@ function navClass({ isActive }) {
 
 export default function Layout() {
   const { user, isAuthenticated, logoutUser } = useAuth()
+  const { t } = useI18n()
   const nav = useNavigate()
   const { pathname } = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -20,7 +22,7 @@ export default function Layout() {
 
   function handleLogout() {
     logoutUser()
-    toast.success('Signed out')
+    toast.success(t('nav.signedOut'))
     nav('/')
   }
 
@@ -31,24 +33,25 @@ export default function Layout() {
           <Logo />
 
           <nav className="hidden items-center gap-1 sm:flex" aria-label="Main">
+            <LanguageToggle className="mr-2" />
             {isAuthenticated ? (
               <>
-                <NavLink to="/dashboard" className={navClass}>My shops</NavLink>
-                <Link to="/create" className="btn-ink btn-sm ml-2"><Mic className="h-4 w-4" aria-hidden="true" /> New shop</Link>
+                <NavLink to="/dashboard" className={navClass}>{t('nav.myShops')}</NavLink>
+                <Link to="/create" className="btn-ink btn-sm ml-2"><Mic className="h-4 w-4" aria-hidden="true" /> {t('nav.newShop')}</Link>
                 <div className="ml-3 flex items-center gap-2 border-l border-neel-100 pl-3">
                   <span className="grid h-9 w-9 place-items-center rounded-full bg-neel-100 font-bold text-neel" aria-hidden="true">
                     {user?.name?.[0]?.toUpperCase() || 'U'}
                   </span>
                   <span className="max-w-[9rem] truncate text-sm font-medium text-neel-700">{user?.name}</span>
-                  <button onClick={handleLogout} className="grid h-9 w-9 place-items-center rounded-xl text-neel-500 hover:bg-neel-100 hover:text-neel" aria-label="Sign out" title="Sign out">
+                  <button onClick={handleLogout} className="grid h-9 w-9 place-items-center rounded-xl text-neel-500 hover:bg-neel-100 hover:text-neel" aria-label={t('nav.signOut')} title={t('nav.signOut')}>
                     <LogOut className="h-4 w-4" />
                   </button>
                 </div>
               </>
             ) : (
               <>
-                <NavLink to="/login" className={navClass}>Sign in</NavLink>
-                <Link to="/create" className="btn-ink btn-sm ml-2"><Mic className="h-4 w-4" aria-hidden="true" /> Make my shop page</Link>
+                <NavLink to="/login" className={navClass}>{t('nav.signIn')}</NavLink>
+                <Link to="/create" className="btn-ink btn-sm ml-2"><Mic className="h-4 w-4" aria-hidden="true" /> {t('nav.makePage')}</Link>
               </>
             )}
           </nav>
@@ -58,7 +61,7 @@ export default function Layout() {
             onClick={() => setMenuOpen(o => !o)}
             aria-expanded={menuOpen}
             aria-controls="mobile-menu"
-            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+            aria-label={menuOpen ? t('nav.closeMenu') : t('nav.openMenu')}
           >
             {menuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
@@ -66,17 +69,18 @@ export default function Layout() {
 
         {menuOpen && (
           <nav id="mobile-menu" aria-label="Main" className="grid gap-1 border-t border-neel-100 bg-white px-4 pb-4 pt-2 sm:hidden">
+            <LanguageToggle className="mb-2 self-start" />
             {isAuthenticated ? (
               <>
-                <p className="px-3 py-2 text-sm text-neel-500">Signed in as <span className="font-semibold text-neel">{user?.name}</span></p>
-                <NavLink to="/dashboard" className={navClass}>My shops</NavLink>
-                <Link to="/create" className="btn-ink mt-1"><Mic className="h-4 w-4" aria-hidden="true" /> New shop</Link>
-                <button onClick={handleLogout} className="btn-ghost justify-start"><LogOut className="h-4 w-4" aria-hidden="true" /> Sign out</button>
+                <p className="px-3 py-2 text-sm text-neel-500">{t('nav.signedInAs', { name: user?.name || '' })}</p>
+                <NavLink to="/dashboard" className={navClass}>{t('nav.myShops')}</NavLink>
+                <Link to="/create" className="btn-ink mt-1"><Mic className="h-4 w-4" aria-hidden="true" /> {t('nav.newShop')}</Link>
+                <button onClick={handleLogout} className="btn-ghost justify-start"><LogOut className="h-4 w-4" aria-hidden="true" /> {t('nav.signOut')}</button>
               </>
             ) : (
               <>
-                <Link to="/create" className="btn-ink"><Mic className="h-4 w-4" aria-hidden="true" /> Make my shop page</Link>
-                <NavLink to="/login" className={navClass}>Sign in</NavLink>
+                <Link to="/create" className="btn-ink"><Mic className="h-4 w-4" aria-hidden="true" /> {t('nav.makePage')}</Link>
+                <NavLink to="/login" className={navClass}>{t('nav.signIn')}</NavLink>
               </>
             )}
           </nav>
@@ -90,7 +94,7 @@ export default function Layout() {
       <footer className="border-t border-neel-100 bg-white">
         <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-8 text-sm text-neel-500 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <Logo />
-          <p>Shop websites made by voice, for every bazaar in India.</p>
+          <p>{t('footer.tagline')}</p>
         </div>
       </footer>
     </div>

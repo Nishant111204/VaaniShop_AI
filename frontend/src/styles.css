@@ -38,8 +38,9 @@
   .btn-sm {
     @apply rounded-xl px-3.5 py-2.5 text-sm;
   }
+  /* A solid pale fill when disabled: 50% opacity would let a yellow background turn it brown. */
   .btn-ink {
-    @apply btn bg-neel text-white hover:bg-neel-700;
+    @apply btn bg-neel text-white hover:bg-neel-700 disabled:bg-neel-300 disabled:opacity-100;
   }
   .btn-haldi {
     @apply btn bg-haldi text-neel-900 hover:bg-haldi-deep;
