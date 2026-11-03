@@ -1,244 +1,213 @@
 import React from 'react'
-import { Link } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext.jsx'
+import { Link, useNavigate } from 'react-router-dom'
+import { AudioLines, Camera, CheckCheck, Keyboard, MessageCircle, Mic, QrCode } from 'lucide-react'
+import PhoneFrame from '../components/PhoneFrame.jsx'
+import ShopSite from '../components/ShopSite.jsx'
+import VoiceCapture from '../components/VoiceCapture.jsx'
+import { setPendingInput } from '../lib/pendingInput.js'
+import { orderMessage } from '../lib/shop.js'
 
-const STEPS = [
-  {
-    step: '01',
-    icon: '🎙️',
-    title: 'Speak your shop details',
-    desc: 'Just say your shop name, products, timing, address, and WhatsApp in any language — Hindi, Marathi, or English.',
-  },
-  {
-    step: '02',
-    icon: '🤖',
-    title: 'AI builds your website',
-    desc: 'Our AI instantly extracts every detail — products, prices, hours, contact info — and structures it perfectly.',
-  },
-  {
-    step: '03',
-    icon: '🌐',
-    title: 'Share your shop link',
-    desc: 'Get a professional shop page with WhatsApp button and QR code. Share it anywhere in under 30 seconds.',
-  },
-]
+const SAMPLE_SHOP = {
+  shopName: 'Sharma Kirana Store',
+  tagline: 'Fresh staples, fair prices, since 1998',
+  description: 'Your neighbourhood kirana in Kothrud for daily rations, dals, oils and household needs. Order on WhatsApp and pick up in five minutes, or ask about home delivery nearby.',
+  category: 'grocery',
+  address: 'Karve Road, Kothrud, Pune',
+  phone: '9876543210',
+  whatsapp: '9876543210',
+  timing: '8:00 AM – 10:00 PM, Mon–Sat',
+  theme: 'green',
+  products: [
+    { name: 'Sona Masoori Rice', price: '₹60/kg', description: 'Everyday rice, cleaned and sorted.', category: 'Staples', emoji: '🍚' },
+    { name: 'Toor Dal', price: '₹120/kg', description: 'Unpolished, cooks soft.', category: 'Staples', emoji: '🫘' },
+    { name: 'Fortune Sunflower Oil', price: '₹150 per litre', description: '1 litre pouch.', category: 'Staples', emoji: '🛢️' },
+    { name: 'Chakki Atta', price: '₹45/kg', description: 'Freshly ground wheat flour.', category: 'Staples', emoji: '🌾' },
+    { name: 'Amul Butter', price: '₹58', description: '100 g pack.', category: 'Dairy', emoji: '🧈' },
+  ],
+}
 
-const CATEGORIES = [
-  { icon: '🛒', name: 'Grocery', color: 'bg-green-50 border-green-200 text-green-700' },
-  { icon: '🍞', name: 'Bakery', color: 'bg-orange-50 border-orange-200 text-orange-700' },
-  { icon: '💊', name: 'Pharmacy', color: 'bg-blue-50 border-blue-200 text-blue-700' },
-  { icon: '📱', name: 'Electronics', color: 'bg-slate-50 border-slate-200 text-slate-700' },
-  { icon: '✂️', name: 'Salon', color: 'bg-purple-50 border-purple-200 text-purple-700' },
-  { icon: '🍽️', name: 'Restaurant', color: 'bg-red-50 border-red-200 text-red-700' },
-  { icon: '👗', name: 'Clothing', color: 'bg-pink-50 border-pink-200 text-pink-700' },
-  { icon: '🔧', name: 'Hardware', color: 'bg-yellow-50 border-yellow-200 text-yellow-700' },
-]
+const SAMPLE_ORDER = orderMessage(
+  SAMPLE_SHOP.shopName,
+  [
+    { qty: 2, name: 'Sona Masoori Rice', price: '₹60/kg' },
+    { qty: 1, name: 'Toor Dal', price: '₹120/kg' },
+    { qty: 1, name: 'Fortune Sunflower Oil', price: '₹150 per litre' },
+  ],
+  390,
+  false,
+)
 
-const TESTIMONIALS = [
-  {
-    name: 'Ramesh Patil',
-    shop: 'Patil General Store, Pune',
-    quote: 'Maine 2 minute mein meri dukaan ki website bana di. Ab customers WhatsApp pe order karte hain!',
-    avatar: 'RP',
-    theme: 'bg-green-600',
-  },
-  {
-    name: 'Sunita Sharma',
-    shop: 'Sunita Bakery, Mumbai',
-    quote: 'Voice mein bola aur poori website ban gayi. Products, timing sab kuch. Bahut aasan hai!',
-    avatar: 'SS',
-    theme: 'bg-orange-600',
-  },
-  {
-    name: 'Vinod Kumar',
-    shop: 'VK Electronics, Delhi',
-    quote: 'My shop now looks professional online. Customers can see all our products and call directly.',
-    avatar: 'VK',
-    theme: 'bg-blue-700',
-  },
-]
-
-const STATS = [
-  { value: '30s', label: 'to create a shop' },
-  { value: '10+', label: 'shop categories' },
-  { value: '3', label: 'languages supported' },
-  { value: '100%', label: 'voice-powered' },
+const LANGUAGE_WALL = [
+  ['हिंदी', 'hi'], ['मराठी', 'mr'], ['ગુજરાતી', 'gu'], ['தமிழ்', 'ta'], ['తెలుగు', 'te'], ['ಕನ್ನಡ', 'kn'],
+  ['বাংলা', 'bn'], ['ਪੰਜਾਬੀ', 'pa'], ['മലയാളം', 'ml'], ['اردو', 'ur'], ['English', 'en'],
 ]
 
 export default function HomePage() {
-  const { isAuthenticated } = useAuth()
+  const nav = useNavigate()
+
+  function handleAudio(audio, language, extension) {
+    setPendingInput({ audio, language, extension })
+    nav('/create')
+  }
 
   return (
-    <div className="grid gap-0">
-      {/* Hero */}
-      <section className="relative text-center py-16 sm:py-24 overflow-hidden">
-        <div className="absolute inset-0 -z-10 bg-gradient-to-b from-slate-50 to-white pointer-events-none" />
-        <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-slate-900/[0.03] blur-3xl -z-10 pointer-events-none" />
+    <>
+      {/* Hero: the microphone works right here */}
+      <section className="on-haldi overflow-hidden bg-haldi">
+        <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 pb-16 pt-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_400px] lg:pb-24 lg:pt-14">
+          <div>
+            <h1 className="sign rise text-[clamp(3.2rem,10vw,6.6rem)] text-neel-900" lang="hi">
+              बोलिए,<br />दुकान ऑनलाइन।
+            </h1>
+            <p className="rise mt-5 max-w-[34ch] text-[clamp(1.25rem,2.4vw,1.6rem)] font-medium leading-snug text-neel-900" style={{ '--i': 1 }}>
+              Speak about your shop in your own language. Get a website with your price list, WhatsApp orders and a QR code for the counter.
+            </p>
 
-        <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-1.5 text-xs font-medium text-slate-600 mb-6 shadow-sm">
-          <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
-          Voice-powered · AI-driven · Instant websites
-        </div>
-
-        <h1 className="text-4xl sm:text-6xl font-bold tracking-tight text-slate-900 leading-tight max-w-3xl mx-auto">
-          Your shop website,<br />
-          <span className="text-slate-400">built by your voice</span>
-        </h1>
-
-        <p className="mt-6 text-lg text-slate-500 max-w-xl mx-auto leading-relaxed">
-          Speak about your business in Hindi, Marathi, or English — VaaniShop AI creates a complete, shareable website for your shop in under 30 seconds.
-        </p>
-
-        <div className="mt-10 flex flex-col sm:flex-row gap-3 justify-center">
-          {isAuthenticated ? (
-            <>
-              <Link
-                to="/create"
-                className="rounded-xl bg-slate-900 px-8 py-3.5 text-sm font-semibold text-white hover:bg-slate-700 transition-colors shadow-lg shadow-slate-900/20"
-              >
-                Create a new shop
+            <div className="rise mt-10" style={{ '--i': 2 }}>
+              <VoiceCapture onAudio={handleAudio} size="md" layout="row" showLanguages={false} idleLabel="Tap and tell us about your shop" />
+            </div>
+            <p className="rise mt-5 text-neel-700" style={{ '--i': 3 }}>
+              <Link to="/create?mode=type" className="inline-flex items-center gap-1.5 font-semibold text-neel underline underline-offset-4">
+                <Keyboard className="h-4 w-4" aria-hidden="true" /> Prefer typing? Type it instead
               </Link>
-              <Link
-                to="/dashboard"
-                className="rounded-xl border border-slate-200 bg-white px-8 py-3.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
-              >
-                View my shops
-              </Link>
-            </>
-          ) : (
-            <>
-              <Link
-                to="/register"
-                className="rounded-xl bg-slate-900 px-8 py-3.5 text-sm font-semibold text-white hover:bg-slate-700 transition-colors shadow-lg shadow-slate-900/20"
-              >
-                Get started free
-              </Link>
-              <Link
-                to="/login"
-                className="rounded-xl border border-slate-200 bg-white px-8 py-3.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
-              >
-                Sign in
-              </Link>
-            </>
-          )}
-        </div>
-
-        {/* Mini demo snippet */}
-        <div className="mt-12 mx-auto max-w-lg rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-900/10 p-5 text-left">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="h-2 w-2 rounded-full bg-rose-400" />
-            <span className="h-2 w-2 rounded-full bg-yellow-400" />
-            <span className="h-2 w-2 rounded-full bg-green-400" />
-            <span className="text-xs text-slate-400 ml-2">Voice Input Preview</span>
+              <span className="ml-1">Free, and no account needed to try.</span>
+            </p>
           </div>
-          <p className="text-sm text-slate-600 italic leading-relaxed">
-            "Mera naam Ramesh General Store hai Pune mein. Hum rice, dal, oil, aur atta bechte hain.
-            Timing 8 baje se 10 baje tak hai. WhatsApp number 9876543210 hai..."
-          </p>
-          <div className="mt-3 flex items-center gap-2">
-            <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-xs text-slate-400">AI extracting shop details…</span>
+
+          <div className="relative mx-auto">
+            <figure className="pop absolute -left-10 top-[23rem] z-30 hidden w-64 rounded-[22px] rounded-bl-md bg-white p-4 shadow-lift sm:block lg:-left-44" style={{ '--i': 2 }}>
+              <figcaption className="flex items-center gap-2 text-sm font-semibold text-neel-500">
+                <AudioLines className="h-4 w-4 text-sindoor" aria-hidden="true" /> Voice note, 0:24
+              </figcaption>
+              <blockquote className="mt-2 leading-snug text-neel-900" lang="hi">
+                “शर्मा किराना, कोथरूड। चावल साठ रुपये किलो, तूर दाल एक सौ बीस…”
+              </blockquote>
+            </figure>
+            <div className="pop" style={{ '--i': 4 }}>
+              <PhoneFrame screenClassName="h-[560px] sm:h-[620px]">
+                <ShopSite data={SAMPLE_SHOP} />
+              </PhoneFrame>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Stats */}
-      <section className="border-y bg-white py-10 mb-16">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 max-w-3xl mx-auto px-4">
-          {STATS.map(s => (
-            <div key={s.label} className="text-center">
-              <div className="text-3xl font-bold text-slate-900">{s.value}</div>
-              <div className="text-xs text-slate-500 mt-1">{s.label}</div>
+      {/* WhatsApp ordering */}
+      <section className="bg-white">
+        <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-20 sm:px-6 lg:grid-cols-2 lg:py-28">
+          <div>
+            <h2 className="text-[clamp(2.2rem,4.5vw,3.5rem)] font-bold leading-[1.05] text-neel-900 condensed">
+              Customers fill a basket. You get the order on WhatsApp.
+            </h2>
+            <p className="mt-5 max-w-[46ch] text-xl leading-relaxed text-neel-700">
+              Every item on your page has an Add button. When the customer taps Order, WhatsApp opens with the full list and the total, already written. You reply, pack and they pick up.
+            </p>
+            <p className="mt-4 max-w-[46ch] text-lg text-neel-500">No app to install for you or your customers. No commission on any order.</p>
+          </div>
+          <div className="mx-auto w-full max-w-md rounded-[32px] bg-[#EFE7DD] p-5 sm:p-8">
+            <div className="ml-auto max-w-[88%] rounded-2xl rounded-tr-md bg-[#D9FDD3] p-4 text-[15px] leading-relaxed text-neel-900 shadow-sm">
+              <p className="whitespace-pre-line">{SAMPLE_ORDER}</p>
+              <p className="mt-1 flex items-center justify-end gap-1 text-xs text-neel-500">
+                10:42 AM <CheckCheck className="h-4 w-4 text-[#53BDEB]" aria-label="Read" />
+              </p>
             </div>
-          ))}
+            <div className="mt-3 max-w-[70%] rounded-2xl rounded-tl-md bg-white p-4 text-[15px] text-neel-900 shadow-sm">
+              Ready in 10 minutes 🙏
+              <p className="mt-1 text-right text-xs text-neel-500">10:43 AM</p>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* How it works */}
-      <section className="mb-20">
-        <div className="text-center mb-10">
-          <h2 className="text-2xl sm:text-3xl font-bold text-slate-900">How it works</h2>
-          <p className="mt-2 text-slate-500">Three simple steps to your online shop presence</p>
-        </div>
-        <div className="grid gap-6 sm:grid-cols-3">
-          {STEPS.map((s) => (
-            <div key={s.step} className="relative rounded-2xl border bg-white p-7 hover:shadow-md transition-shadow">
-              <div className="text-3xl mb-4">{s.icon}</div>
-              <div className="absolute top-5 right-5 text-xs font-bold text-slate-200 text-4xl font-mono leading-none select-none">
-                {s.step}
-              </div>
-              <h3 className="font-semibold text-slate-900 mb-2">{s.title}</h3>
-              <p className="text-sm text-slate-500 leading-relaxed">{s.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Categories */}
-      <section className="mb-20">
-        <div className="text-center mb-8">
-          <h2 className="text-2xl font-bold text-slate-900">Works for every shop</h2>
-          <p className="mt-2 text-sm text-slate-500">From kirana stores to salons — any business can get online</p>
-        </div>
-        <div className="grid grid-cols-4 sm:grid-cols-8 gap-3">
-          {CATEGORIES.map(c => (
-            <div
-              key={c.name}
-              className={`rounded-xl border p-3 text-center ${c.color}`}
-            >
-              <div className="text-2xl mb-1">{c.icon}</div>
-              <div className="text-xs font-medium">{c.name}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Testimonials */}
-      <section className="mb-20">
-        <div className="text-center mb-10">
-          <h2 className="text-2xl font-bold text-slate-900">Loved by shopkeepers</h2>
-          <p className="mt-2 text-sm text-slate-500">Real shops, real results</p>
-        </div>
-        <div className="grid gap-5 sm:grid-cols-3">
-          {TESTIMONIALS.map(t => (
-            <div key={t.name} className="rounded-2xl border bg-white p-6">
-              <p className="text-sm text-slate-700 leading-relaxed italic mb-5">"{t.quote}"</p>
-              <div className="flex items-center gap-3">
-                <div className={`${t.theme} h-9 w-9 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0`}>
-                  {t.avatar}
-                </div>
+      {/* Steps: a real sequence, so numbered */}
+      <section className="bg-neel-50">
+        <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:py-24">
+          <h2 className="text-[clamp(2rem,4vw,3rem)] font-bold leading-tight text-neel-900 condensed">Online in two minutes</h2>
+          <ol className="mt-10 grid gap-8 md:grid-cols-3">
+            {[
+              { icon: Mic, title: 'Speak', body: 'Tap the mic and talk about your shop the way you would tell a new customer: name, items, prices, timings, WhatsApp number.' },
+              { icon: CheckCheck, title: 'Check', body: 'See your page right away. Fix the shop name or number, untick items you don’t sell, pick a colour.' },
+              { icon: MessageCircle, title: 'Share', body: 'Publish, then send the link to your WhatsApp groups and put the QR code on your counter.' },
+            ].map((s, i) => (
+              <li key={s.title} className="flex gap-4">
+                <span className="sign grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-haldi text-3xl text-neel-900">{i + 1}</span>
                 <div>
-                  <div className="text-sm font-semibold text-slate-900">{t.name}</div>
-                  <div className="text-xs text-slate-500">{t.shop}</div>
+                  <h3 className="flex items-center gap-2 text-2xl font-bold text-neel-900">{s.title}</h3>
+                  <p className="mt-1.5 text-lg leading-relaxed text-neel-700">{s.body}</p>
                 </div>
-              </div>
-            </div>
-          ))}
+              </li>
+            ))}
+          </ol>
         </div>
       </section>
 
-      {/* Final CTA */}
-      <section className="rounded-3xl bg-slate-900 text-white p-10 sm:p-16 text-center mb-8">
-        <h2 className="text-3xl font-bold">Ready to take your shop online?</h2>
-        <p className="mt-3 text-slate-400 max-w-xl mx-auto">
-          No typing, no technical skills needed. Just speak and your shop website is live in seconds.
-        </p>
-        {!isAuthenticated ? (
-          <Link
-            to="/register"
-            className="mt-8 inline-block rounded-xl bg-white text-slate-900 px-8 py-3.5 text-sm font-semibold hover:bg-slate-100 transition-colors"
-          >
-            Create your free shop website →
-          </Link>
-        ) : (
-          <Link
-            to="/create"
-            className="mt-8 inline-block rounded-xl bg-white text-slate-900 px-8 py-3.5 text-sm font-semibold hover:bg-slate-100 transition-colors"
-          >
-            Create a new shop →
-          </Link>
-        )}
+      {/* Languages as type */}
+      <section className="bg-white">
+        <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:py-28">
+          <h2 className="max-w-[24ch] text-[clamp(2rem,4vw,3rem)] font-bold leading-tight text-neel-900 condensed">
+            Speak the language you speak to your customers
+          </h2>
+          <p className="mt-3 max-w-[52ch] text-xl text-neel-700">Mix languages if you like. Your page is written in clear English that every customer can read.</p>
+          <ul className="mt-10 flex flex-wrap gap-x-8 gap-y-3" aria-label="Supported languages">
+            {LANGUAGE_WALL.map(([label, lang], i) => (
+              <li key={lang} lang={lang} className={`text-[clamp(2rem,5.5vw,4.25rem)] font-semibold leading-tight ${i % 3 === 0 ? 'text-sindoor' : i % 3 === 1 ? 'text-neel' : 'text-neel-300'}`}>
+                {label}
+              </li>
+            ))}
+          </ul>
+        </div>
       </section>
-    </div>
+
+      {/* Counter tools */}
+      <section className="bg-neel-50">
+        <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:py-24">
+          <h2 className="text-[clamp(2rem,4vw,3rem)] font-bold leading-tight text-neel-900 condensed">Made for the counter, not the computer</h2>
+          <div className="mt-10 grid gap-5 lg:grid-cols-[1.1fr_1fr]">
+            <div className="panel flex flex-col gap-6 p-6 sm:flex-row sm:items-center sm:p-8">
+              <div className="mx-auto w-40 shrink-0 overflow-hidden rounded-xl border border-neel-100 bg-white text-center shadow-lift" aria-hidden="true">
+                <div className="awning awning-sm" style={{ '--awning': '#2E9A5F' }} />
+                <p className="sign mt-5 px-2 text-xl leading-tight text-[#0F3D27]">Sharma Kirana</p>
+                <div className="mx-auto my-3 grid h-20 w-20 place-items-center rounded-lg border-2 border-[#2E9A5F]"><QrCode className="h-14 w-14 text-neel-900" /></div>
+                <p className="pb-4 text-[11px] font-semibold text-neel-700">Scan for our price list</p>
+              </div>
+              <div>
+                <h3 className="text-2xl font-bold text-neel-900">A QR poster for your shutter</h3>
+                <p className="mt-2 text-lg leading-relaxed text-neel-700">Print it on A4 and stick it on the counter. Customers scan, see today’s prices and order next time from home.</p>
+              </div>
+            </div>
+            <div className="grid gap-5">
+              <div className="panel p-6 sm:p-8">
+                <h3 className="text-2xl font-bold text-neel-900">Change prices by voice</h3>
+                <p className="mt-2 text-lg text-neel-700">Say what changed. Everything else stays as it is.</p>
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <span className="rounded-2xl rounded-bl-md bg-neel-50 px-3.5 py-2 font-medium text-neel-900" lang="hi">“आज से संडे बंद रहेगा”</span>
+                  <span className="rounded-full bg-paan-soft px-3 py-1 text-sm font-semibold text-paan-deep">Timings now Mon–Sat</span>
+                </div>
+              </div>
+              <div className="panel flex items-start gap-4 p-6 sm:p-8">
+                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-haldi"><Camera className="h-6 w-6 text-neel-900" aria-hidden="true" /></span>
+                <div>
+                  <h3 className="text-2xl font-bold text-neel-900">Photos straight from your phone</h3>
+                  <p className="mt-2 text-lg text-neel-700">Snap your shelves and products. We shrink each photo so your page loads fast on any network.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Closing call */}
+      <section className="bg-neel-900">
+        <div className="mx-auto flex max-w-6xl flex-col items-start gap-8 px-4 py-20 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:py-24">
+          <div>
+            <p className="sign text-[clamp(2.6rem,6vw,4.5rem)] text-haldi" lang="hi">शटर उठाइए, दुकान ऑनलाइन।</p>
+            <p className="mt-3 max-w-[40ch] text-xl text-white/80">Open your shop online today. It takes one voice note.</p>
+          </div>
+          <Link to="/create" className="btn-haldi shrink-0 whitespace-nowrap px-8 py-5 text-lg">
+            <Mic className="h-5 w-5" aria-hidden="true" /> Make my shop page
+          </Link>
+        </div>
+      </section>
+    </>
   )
 }

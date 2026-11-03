@@ -1,105 +1,40 @@
 import React, { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
+import { Copy, ExternalLink, Eye, Mic, Package, Pencil, Trash2 } from 'lucide-react'
+import Modal from '../components/Modal.jsx'
 import Spinner from '../components/Spinner.jsx'
-import { deleteShop, getMyShops } from '../lib/api.js'
 import { useAuth } from '../context/AuthContext.jsx'
+import { deleteShop, getMyShops } from '../lib/api.js'
+import { categoryEmoji, getTheme, shopPath, shopUrl } from '../lib/shop.js'
 
-const CATEGORY_STYLES = {
-  grocery:    'bg-green-100 text-green-800',
-  bakery:     'bg-orange-100 text-orange-800',
-  restaurant: 'bg-red-100 text-red-800',
-  pharmacy:   'bg-blue-100 text-blue-800',
-  electronics:'bg-slate-100 text-slate-700',
-  clothing:   'bg-purple-100 text-purple-800',
-  salon:      'bg-pink-100 text-pink-800',
-  hardware:   'bg-yellow-100 text-yellow-800',
-  dairy:      'bg-sky-100 text-sky-800',
-  mobile:     'bg-indigo-100 text-indigo-800',
-  default:    'bg-slate-100 text-slate-600',
-}
-
-function categoryClass(cat) {
-  return CATEGORY_STYLES[cat?.toLowerCase()] || CATEGORY_STYLES.default
-}
-
-function ShopCard({ shop, onDelete, deleting }) {
-  const publicUrl = `${window.location.origin}/shop/${shop.shopId}`
-
-  function copyLink() {
-    navigator.clipboard.writeText(publicUrl)
-    toast.success('Link copied!')
-  }
-
+function ShopCard({ shop, onDelete }) {
+  const t = getTheme(shop.theme)
   return (
-    <div className="rounded-2xl border bg-white shadow-sm hover:shadow-md transition-shadow flex flex-col">
-      {/* Card header strip */}
-      <div className="h-1.5 rounded-t-2xl bg-slate-900" />
-
-      <div className="p-5 flex flex-col gap-3 flex-1">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <h2 className="font-semibold text-slate-900 leading-tight truncate">{shop.shopName}</h2>
-            {shop.category && (
-              <span className={`mt-1.5 inline-block rounded-full px-2 py-0.5 text-xs font-medium capitalize ${categoryClass(shop.category)}`}>
-                {shop.category}
-              </span>
-            )}
-          </div>
-          {shop.viewCount > 0 && (
-            <div className="shrink-0 flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 text-xs text-slate-500">
-              <span>👁</span>
-              <span>{shop.viewCount}</span>
-            </div>
-          )}
-        </div>
-
-        {shop.description && (
-          <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">{shop.description}</p>
-        )}
-
-        {shop.slug && (
-          <div className="flex items-center gap-1.5 text-xs text-slate-400 bg-slate-50 rounded-lg px-2.5 py-1.5">
-            <span>🔗</span>
-            <span className="truncate font-mono">/shop/{shop.slug}</span>
-          </div>
-        )}
-
-        <div className="text-xs text-slate-400 mt-auto">
-          Created {new Date(shop.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-        </div>
-
-        {/* Actions */}
-        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
-          <Link
-            to={`/manage/${shop.shopId}`}
-            className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium text-white text-center hover:bg-slate-700 transition-colors"
-          >
-            Manage
-          </Link>
-          <Link
-            to={`/shop/${shop.shopId}`}
-            target="_blank"
-            className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 text-center hover:bg-slate-50 transition-colors"
-          >
-            View Page
-          </Link>
-          <button
-            onClick={copyLink}
-            className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"
-          >
-            Copy Link
+    <article className="panel flex flex-col overflow-hidden">
+      <div className="awning awning-sm" style={{ '--awning': t.awning }} />
+      <div className="flex flex-1 flex-col p-5 pt-7">
+        <p className="text-sm font-medium capitalize text-neel-500">
+          <span aria-hidden="true">{categoryEmoji(shop.category)}</span> {shop.category || 'Shop'}
+        </p>
+        <h2 className="sign mt-1 break-words text-[1.9rem]" style={{ color: t.ink }}>{shop.shopName}</h2>
+        {shop.tagline && <p className="mt-1 text-neel-500 line-clamp-2">{shop.tagline}</p>}
+        <p className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-sm font-medium text-neel-700">
+          <span className="inline-flex items-center gap-1.5"><Eye className="h-4 w-4 text-neel-300" aria-hidden="true" /> {shop.viewCount} {shop.viewCount === 1 ? 'visit' : 'visits'}</span>
+          <span className="inline-flex items-center gap-1.5"><Package className="h-4 w-4 text-neel-300" aria-hidden="true" /> {shop.productCount} {shop.productCount === 1 ? 'item' : 'items'}</span>
+        </p>
+        <div className="mt-auto flex gap-2 pt-5">
+          <Link to={`/manage/${shop.shopId}`} className="btn-ink btn-sm flex-1"><Pencil className="h-4 w-4" aria-hidden="true" /> Edit</Link>
+          <a href={shopPath(shop)} target="_blank" rel="noreferrer" className="btn-line btn-sm"><ExternalLink className="h-4 w-4" aria-hidden="true" /> Open</a>
+          <button type="button" onClick={() => { navigator.clipboard?.writeText(shopUrl(shop)); toast.success('Link copied') }} className="btn-line btn-sm px-3" aria-label={`Copy link to ${shop.shopName}`} title="Copy link">
+            <Copy className="h-4 w-4" />
           </button>
-          <button
-            onClick={() => onDelete(shop.shopId, shop.shopName)}
-            disabled={deleting === shop.shopId}
-            className="rounded-lg border border-rose-200 px-3 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 disabled:opacity-50 transition-colors"
-          >
-            {deleting === shop.shopId ? '…' : 'Delete'}
+          <button type="button" onClick={() => onDelete(shop)} className="btn-line btn-sm px-3 text-sindoor hover:border-sindoor/40 hover:bg-sindoor-soft" aria-label={`Delete ${shop.shopName}`} title="Delete">
+            <Trash2 className="h-4 w-4" />
           </button>
         </div>
       </div>
-    </div>
+    </article>
   )
 }
 
@@ -107,102 +42,76 @@ export default function ShopListPage() {
   const { user } = useAuth()
   const [shops, setShops] = useState([])
   const [loading, setLoading] = useState(true)
-  const [deleting, setDeleting] = useState(null)
+  const [toDelete, setToDelete] = useState(null)
+  const [deleting, setDeleting] = useState(false)
 
-  async function load() {
-    setLoading(true)
+  useEffect(() => {
+    getMyShops()
+      .then(setShops)
+      .catch(e => toast.error(e.message || 'Could not load your shops'))
+      .finally(() => setLoading(false))
+  }, [])
+
+  async function confirmDelete() {
+    setDeleting(true)
     try {
-      const res = await getMyShops()
-      setShops(res)
+      await deleteShop(toDelete.shopId)
+      setShops(prev => prev.filter(s => s.shopId !== toDelete.shopId))
+      toast.success(`Deleted ${toDelete.shopName}`)
+      setToDelete(null)
     } catch (e) {
-      toast.error(e.message || 'Failed to load shops')
+      toast.error(e.message || 'Could not delete. Try again.')
     } finally {
-      setLoading(false)
+      setDeleting(false)
     }
   }
 
-  useEffect(() => { load() }, [])
-
-  async function handleDelete(shopId, shopName) {
-    if (!window.confirm(`Delete "${shopName}"? This cannot be undone.`)) return
-    setDeleting(shopId)
-    try {
-      await deleteShop(shopId)
-      setShops(prev => prev.filter(s => s.shopId !== shopId))
-      toast.success('Shop deleted')
-    } catch (e) {
-      toast.error(e.message || 'Failed to delete')
-    } finally {
-      setDeleting(null)
-    }
-  }
-
+  const firstName = (user?.name || '').split(' ')[0]
   const totalViews = shops.reduce((sum, s) => sum + (s.viewCount || 0), 0)
 
   return (
-    <div className="grid gap-6">
-      {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
+    <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">My Shops</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Welcome back, <span className="font-medium text-slate-700">{user?.name}</span>
-          </p>
+          <p className="text-lg text-neel-500">Namaste{firstName ? `, ${firstName}` : ''}</p>
+          <h1 className="text-[clamp(2.2rem,5vw,3rem)] font-bold leading-tight text-neel-900 condensed">Your shops</h1>
+          {shops.length > 0 && (
+            <p className="mt-1 text-neel-700">
+              {shops.length} {shops.length === 1 ? 'shop' : 'shops'} online, visited {totalViews} {totalViews === 1 ? 'time' : 'times'} so far.
+            </p>
+          )}
         </div>
-        <Link
-          to="/create"
-          className="flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-700 transition-colors shadow-md shadow-slate-900/20"
-        >
-          <span>+</span> New Shop
-        </Link>
+        {shops.length > 0 && <Link to="/create" className="btn-ink"><Mic className="h-4 w-4" aria-hidden="true" /> New shop</Link>}
       </div>
-
-      {/* Stats bar */}
-      {shops.length > 0 && (
-        <div className="grid grid-cols-3 gap-3">
-          <div className="rounded-xl border bg-white p-4 text-center">
-            <div className="text-2xl font-bold text-slate-900">{shops.length}</div>
-            <div className="text-xs text-slate-500 mt-0.5">Total Shops</div>
-          </div>
-          <div className="rounded-xl border bg-white p-4 text-center">
-            <div className="text-2xl font-bold text-slate-900">{totalViews}</div>
-            <div className="text-xs text-slate-500 mt-0.5">Total Views</div>
-          </div>
-          <div className="rounded-xl border bg-white p-4 text-center">
-            <div className="text-2xl font-bold text-slate-900">{shops.filter(s => s.viewCount > 0).length}</div>
-            <div className="text-xs text-slate-500 mt-0.5">Active Shops</div>
-          </div>
-        </div>
-      )}
 
       {loading ? (
         <Spinner label="Loading your shops…" />
       ) : shops.length === 0 ? (
-        <div className="rounded-2xl border bg-white p-16 text-center shadow-sm">
-          <div className="text-5xl mb-4">🛍️</div>
-          <h2 className="text-lg font-semibold text-slate-900">No shops yet</h2>
-          <p className="mt-2 text-sm text-slate-500 max-w-xs mx-auto">
-            Create your first shop website using your voice. Takes less than 30 seconds.
-          </p>
-          <Link
-            to="/create"
-            className="mt-6 inline-block rounded-xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-700 transition-colors"
-          >
-            Create your first shop
-          </Link>
+        <div className="on-haldi mt-10 flex flex-col items-center rounded-[32px] bg-haldi px-6 py-14 text-center">
+          <h2 className="sign text-[clamp(2rem,5vw,3rem)] text-neel-900">Your first shop page is one voice note away</h2>
+          <p className="mt-3 max-w-md text-lg text-neel-700">Tell us your shop name, what you sell and your prices. We will build the page while you wait.</p>
+          <Link to="/create" className="btn-ink mt-8 px-8 py-4 text-lg"><Mic className="h-5 w-5" aria-hidden="true" /> Make my shop page</Link>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {shops.map(shop => (
-            <ShopCard
-              key={shop.shopId}
-              shop={shop}
-              onDelete={handleDelete}
-              deleting={deleting}
-            />
-          ))}
+        <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {shops.map(shop => <ShopCard key={shop.shopId} shop={shop} onDelete={setToDelete} />)}
         </div>
       )}
+
+      <Modal open={!!toDelete} onClose={() => !deleting && setToDelete(null)} labelledBy="delete-title">
+        {toDelete && (
+          <div className="p-6 sm:p-8">
+            <h2 id="delete-title" className="text-2xl font-bold text-neel-900 condensed">Delete {toDelete.shopName}?</h2>
+            <p className="mt-2 text-neel-700">The page, its link and its QR code will stop working for customers. This can’t be undone.</p>
+            <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button type="button" data-autofocus onClick={() => setToDelete(null)} className="btn-line">Keep shop</button>
+              <button type="button" onClick={confirmDelete} disabled={deleting} className="btn-danger">
+                <Trash2 className="h-4 w-4" aria-hidden="true" /> {deleting ? 'Deleting…' : 'Delete shop'}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }

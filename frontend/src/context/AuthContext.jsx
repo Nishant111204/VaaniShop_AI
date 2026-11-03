@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { setAuth, getToken, getStoredUser, clearAuth } from '../lib/storage.js'
+import { UNAUTHORIZED_EVENT } from '../lib/api.js'
 
 const AuthContext = createContext(null)
 
@@ -13,14 +14,20 @@ export function AuthProvider({ children }) {
     setUser(user)
   }
 
-  function logoutUser() {
+  const logoutUser = useCallback(() => {
     clearAuth()
     setToken('')
     setUser(null)
-  }
+  }, [])
+
+  // An expired or invalid token means the stored session is useless; drop it.
+  useEffect(() => {
+    window.addEventListener(UNAUTHORIZED_EVENT, logoutUser)
+    return () => window.removeEventListener(UNAUTHORIZED_EVENT, logoutUser)
+  }, [logoutUser])
 
   return (
-    <AuthContext.Provider value={{ user, token, loginUser, logoutUser, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, token, loginUser, logoutUser, isAuthenticated: !!user && !!token }}>
       {children}
     </AuthContext.Provider>
   )
