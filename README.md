@@ -19,6 +19,11 @@ price list, WhatsApp ordering, opening hours, directions and a QR poster for the
 - **Share kit.** Friendly link (`/s/ganesh-sweets`), WhatsApp share, QR PNG download and a
   printable A4 counter poster.
 - **"Open now" status** read from the timings text.
+- **Order insights.** Owners see visits, WhatsApp orders, chats, calls, direction taps and
+  shares per day, against the week before. Only anonymous daily counters are stored; no
+  visitor data. Counts are buffered in memory and written every 10 seconds, and public
+  shop data is cached for a minute (cleared on every save), so page views stay fast even
+  when the database is far away.
 - **Rich link previews.** Shared shop links show the shop's own card (awning, name, tagline)
   in WhatsApp and social apps, and carry search-engine business data and a sitemap.
 - **Installable.** Shopkeepers can add VaaniShop to their phone's home screen.
@@ -110,6 +115,10 @@ the `DATABASE_*`, `GROQ_API_KEY`, `JWT_SECRET` and `APP_PUBLIC_URL` variables.
 **Plain Java server:** `./scripts/package.sh` builds `backend/target/vaanishopai-backend-*.jar`
 with the app inside; run it with `java -jar`.
 
+Put the database in the same region as the app, and both close to your users (for India,
+Mumbai or Singapore). Every database round trip from India to a US region costs about
+450 ms; the cache and buffered counters hide most of it, but not on first loads and edits.
+
 Behind nginx, a load balancer or a platform proxy, set `FORWARD_HEADERS_STRATEGY=native` so
 rate limits and generated links use the real client address and `https` scheme. Always set
 `APP_PUBLIC_URL` (e.g. `https://vaanishop.in`) so link previews and the sitemap use your domain.
@@ -129,7 +138,9 @@ image on every push to `main` and every pull request.
 | PUT | `/api/shop/{id}/fields` | owner | Save edits from the editor |
 | POST | `/api/shop/{id}/images` | owner | Upload a JPEG/PNG/WebP photo (max 3 MB) |
 | GET | `/api/images/{id}` | public | Serve a photo |
-| GET | `/api/shop/my` | owner | List your shops |
+| GET | `/api/shop/my` | owner | List your shops (with last-7-day visits and orders) |
+| POST | `/api/shop/{id}/events` | public, rate limited | Record a customer tap: `order`, `whatsapp`, `call`, `directions`, `share` |
+| GET | `/api/shop/{id}/stats?days=30` | owner | Daily counts, 7–90 days |
 | GET | `/api/shop/manage/{id}` | owner | Load a shop for editing |
 | GET | `/api/shop/s/{slug}`, `/api/shop/{id}` | public | Public shop page data (counts a visit) |
 | DELETE | `/api/shop/{id}` | owner | Delete a shop and its photos |
