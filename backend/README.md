@@ -28,7 +28,7 @@ Relevant variables:
 - `DATABASE_URL` (default `jdbc:postgresql://localhost:5432/vaanishopai`)
 - `DATABASE_USERNAME` (default `postgres`)
 - `DATABASE_PASSWORD` (default `postgres`)
-- `CORS_ALLOWED_ORIGINS` (default `http://localhost:5173`)
+- `CORS_ALLOWED_ORIGINS` (default `http://localhost:5847`, the frontend dev server)
 - `JWT_SECRET`
 - `JWT_EXPIRATION_MS` (default `604800000`)
 - `RATE_LIMIT_SPEECH_PER_MINUTE` (default `10`)

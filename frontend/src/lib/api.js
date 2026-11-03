@@ -1,6 +1,8 @@
 import { getToken } from './storage.js'
 
-const BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080'
+// Empty means same origin: the backend serves the built app, and Vite proxies /api in dev.
+// Set VITE_BACKEND_URL only when the frontend is hosted separately from the API.
+const BASE_URL = import.meta.env.VITE_BACKEND_URL || ''
 
 /** Fired when the server rejects our token, so AuthContext can sign the user out. */
 export const UNAUTHORIZED_EVENT = 'vaanishop:unauthorized'

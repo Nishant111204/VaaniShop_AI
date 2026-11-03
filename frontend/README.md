@@ -11,17 +11,11 @@ cd frontend
 npm install
 ```
 
-2. Create `.env`:
-
-```bash
-VITE_BACKEND_URL=http://localhost:8080
-```
-
-3. Run:
+2. Run (the backend should be on `http://localhost:8080`; `/api` is proxied to it):
 
 ```bash
 npm run dev
 ```
 
-Open `http://localhost:5173`.
+Open `http://localhost:5847`. Run the unit tests with `npm test`.
 
