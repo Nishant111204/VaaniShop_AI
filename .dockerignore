@@ -1,0 +1,9 @@
+.git
+.env
+.env.*
+!.env.example
+**/node_modules
+**/dist
+**/target
+**/.DS_Store
+backend/src/main/resources/static

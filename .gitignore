@@ -18,6 +18,8 @@ logs/
 
 # Java / Maven
 backend/target/
+# The built web app is copied here only when packaging (Dockerfile, scripts/package.sh).
+backend/src/main/resources/static/
 target/
 *.class
 *.jar

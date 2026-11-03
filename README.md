@@ -19,6 +19,9 @@ price list, WhatsApp ordering, opening hours, directions and a QR poster for the
 - **Share kit.** Friendly link (`/s/ganesh-sweets`), WhatsApp share, QR PNG download and a
   printable A4 counter poster.
 - **"Open now" status** read from the timings text.
+- **Rich link previews.** Shared shop links show the shop's own card (awning, name, tagline)
+  in WhatsApp and social apps, and carry search-engine business data and a sitemap.
+- **Installable.** Shopkeepers can add VaaniShop to their phone's home screen.
 
 ## Stack
 
@@ -48,6 +51,7 @@ Useful optional settings:
 | `GROQ_REASONING_EFFORT` | `low` | Only for reasoning models such as gpt-oss; leave empty for others |
 | `RATE_LIMIT_AI_PER_MINUTE` | `8` | Page builds and voice edits, per IP or per account |
 | `RATE_LIMIT_SPEECH_PER_MINUTE` | `10` | Transcriptions per IP |
+| `APP_PUBLIC_URL` | from request | Public address used in link previews and the sitemap |
 | `FORWARD_HEADERS_STRATEGY` | `none` | Set to `native` behind a trusted reverse proxy so limits see real client IPs |
 
 The backend reads environment variables from the shell:
@@ -56,11 +60,9 @@ The backend reads environment variables from the shell:
 set -a; source .env; set +a
 ```
 
-The frontend reads `VITE_BACKEND_URL` from `frontend/.env` (defaults to `http://localhost:8080`):
-
-```bash
-cp frontend/.env.example frontend/.env
-```
+The frontend calls the API with relative `/api` URLs. In development Vite proxies them to
+`http://localhost:8080` (override with `VITE_DEV_API`); in production the backend serves the
+app itself, so no frontend configuration is needed.
 
 ## 2) Start PostgreSQL
 
@@ -77,7 +79,7 @@ cd backend
 mvn spring-boot:run
 ```
 
-Runs on `http://localhost:8080`. Tests: `mvn test`.
+API on `http://localhost:8080`. Tests: `mvn test`.
 
 ## 4) Run the frontend
 
@@ -87,7 +89,33 @@ npm install
 npm run dev
 ```
 
-Runs on `http://localhost:5173`.
+Opens on `http://localhost:5847` (fixed with `strictPort`, so it never takes another
+project's port). Tests: `npm test`.
+
+## Deploy
+
+The production build is a single server: Spring Boot serves the API and the built app on
+port 8080.
+
+**Docker Compose (app + Postgres):** set `GROQ_API_KEY`, `JWT_SECRET` (`openssl rand -base64 48`),
+`POSTGRES_PASSWORD` and `APP_PUBLIC_URL` in `.env`, then:
+
+```bash
+docker compose up -d --build
+```
+
+**Docker image only** (bring your own Postgres): `docker build -t vaanishop .` and run it with
+the `DATABASE_*`, `GROQ_API_KEY`, `JWT_SECRET` and `APP_PUBLIC_URL` variables.
+
+**Plain Java server:** `./scripts/package.sh` builds `backend/target/vaanishopai-backend-*.jar`
+with the app inside; run it with `java -jar`.
+
+Behind nginx, a load balancer or a platform proxy, set `FORWARD_HEADERS_STRATEGY=native` so
+rate limits and generated links use the real client address and `https` scheme. Always set
+`APP_PUBLIC_URL` (e.g. `https://vaanishop.in`) so link previews and the sitemap use your domain.
+
+CI (`.github/workflows/ci.yml`) runs the backend and frontend tests and builds the Docker
+image on every push to `main` and every pull request.
 
 ## API overview
 
@@ -105,6 +133,9 @@ Runs on `http://localhost:5173`.
 | GET | `/api/shop/manage/{id}` | owner | Load a shop for editing |
 | GET | `/api/shop/s/{slug}`, `/api/shop/{id}` | public | Public shop page data (counts a visit) |
 | DELETE | `/api/shop/{id}` | owner | Delete a shop and its photos |
+| GET | `/s/{slug}` | public | Shop page HTML with link-preview tags |
+| GET | `/og/{slug}.png` | public | 1200×630 link-preview card |
+| GET | `/sitemap.xml`, `/robots.txt` | public | Search engine discovery |
 
 ## Git hygiene
 
