@@ -11,6 +11,6 @@ public record AppProperties(
 ) {
   public record Cors(String allowedOrigins) {}
   public record Jwt(String secret, long expirationMs) {}
-  public record Groq(String apiKey, String chatModel, String sttModel, String sttLanguage, long timeoutMs) {}
-  public record RateLimit(long speechPerMinute) {}
+  public record Groq(String apiKey, String chatModel, String reasoningEffort, String sttModel, String sttLanguage, long timeoutMs) {}
+  public record RateLimit(long speechPerMinute, long aiPerMinute) {}
 }

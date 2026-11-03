@@ -2,13 +2,12 @@ package com.vaanishopai.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.vaanishopai.dto.ShopResponse;
 import com.vaanishopai.dto.ShopSchema;
 import com.vaanishopai.dto.ShopSummary;
-import com.vaanishopai.dto.ShopUpdateFieldsRequest;
 import com.vaanishopai.exception.BadRequestException;
+import com.vaanishopai.exception.ForbiddenException;
 import com.vaanishopai.exception.NotFoundException;
 import com.vaanishopai.model.Shop;
 import com.vaanishopai.model.User;
@@ -37,113 +36,115 @@ public class ShopService {
     this.objectMapper = objectMapper;
   }
 
+  /** Builds a shop from a description without saving it, so visitors can preview before signing up. */
+  public ShopSchema generateDraft(String text) {
+    return openAiService.generateShop(text);
+  }
+
+  /** Saves a (possibly edited) draft as a new shop owned by {@code owner}. */
+  @Transactional
+  public ShopResponse publish(ShopSchema draft, User owner) {
+    var schema = withoutImages(ShopSanitizer.clean(draft));
+    var shop = new Shop(schema.shopName(), schema.category(), toJsonb(schema), owner);
+    shop.setSlug(generateUniqueSlug(schema.shopName()));
+    return toResponse(repo.save(shop), schema, null);
+  }
+
   @Transactional
   public ShopResponse createFromText(String text, User owner) {
-    var normalized = openAiService.extractShopFromText(text);
-    var schema = normalized.schema();
-    var shop = new Shop(schema.shopName(), schema.category(), normalized.jsonbData(), owner);
-    shop.setSlug(generateUniqueSlug(schema.shopName()));
-    var saved = repo.save(shop);
-    return toResponse(saved, schema);
+    return publish(openAiService.generateShop(text), owner);
   }
 
   @Transactional
   public ShopResponse updateFromText(UUID shopId, String text, User owner) {
-    var shop = findOwned(shopId, owner);
-    var normalized = openAiService.extractShopFromText(text);
-    var schema = normalized.schema();
-    shop.setShopName(schema.shopName());
-    shop.setCategory(schema.category());
-    shop.setData(normalized.jsonbData());
-    if (shop.getSlug() == null) {
-      shop.setSlug(generateUniqueSlug(schema.shopName()));
-    }
-    var saved = repo.save(shop);
-    return toResponse(saved, schema);
+    var shop = requireOwned(shopId, owner);
+    var edit = openAiService.applyChange(toSchema(shop), text);
+    return save(shop, edit.schema(), edit.summary());
   }
 
   @Transactional
-  public ShopResponse updateFields(UUID shopId, ShopUpdateFieldsRequest req, User owner) {
-    var shop = findOwned(shopId, owner);
-    var schema = new ShopSchema(
-        orDefault(req.shopName(), shop.getShopName()),
-        "",
-        orDefault(req.description(), ""),
-        orDefault(req.category(), shop.getCategory()),
-        orDefault(req.address(), ""),
-        orDefault(req.phone(), ""),
-        orDefault(req.whatsapp(), ""),
-        orDefault(req.email(), ""),
-        orDefault(req.timing(), ""),
-        orDefault(req.instagram(), ""),
-        orDefault(req.theme(), ""),
-        req.products() != null ? req.products() : List.of()
-    );
-    var jsonb = schemaToJsonb(schema);
-    shop.setShopName(schema.shopName());
-    shop.setCategory(schema.category());
-    shop.setData(jsonb);
-    if (shop.getSlug() == null) {
-      shop.setSlug(generateUniqueSlug(schema.shopName()));
-    }
-    var saved = repo.save(shop);
-    return toResponse(saved, schema);
+  public ShopResponse updateFields(UUID shopId, ShopSchema fields, User owner) {
+    var shop = requireOwned(shopId, owner);
+    return save(shop, ShopSanitizer.clean(fields), null);
   }
 
   @Transactional
   public ShopResponse getAndTrackView(UUID shopId) {
     var shop = repo.findById(shopId).orElseThrow(() -> new NotFoundException("Shop not found"));
     repo.incrementViewCount(shopId);
-    var schema = toSchema(shop.getShopName(), shop.getData());
-    return toResponse(shop, schema);
+    return toResponse(shop, toSchema(shop), null);
   }
 
   @Transactional
   public ShopResponse getBySlugAndTrackView(String slug) {
     var shop = repo.findBySlug(slug).orElseThrow(() -> new NotFoundException("Shop not found"));
     repo.incrementViewCount(shop.getId());
-    var schema = toSchema(shop.getShopName(), shop.getData());
-    return toResponse(shop, schema);
+    return toResponse(shop, toSchema(shop), null);
   }
 
   @Transactional(readOnly = true)
   public ShopResponse getOwned(UUID shopId, User owner) {
-    var shop = findOwned(shopId, owner);
-    var schema = toSchema(shop.getShopName(), shop.getData());
-    return toResponse(shop, schema);
+    var shop = requireOwned(shopId, owner);
+    return toResponse(shop, toSchema(shop), null);
   }
 
   @Transactional(readOnly = true)
   public List<ShopSummary> listByOwner(User owner) {
     return repo.findByOwnerOrderByCreatedAtDesc(owner).stream()
-        .map(s -> new ShopSummary(
-            s.getId(),
-            s.getShopName(),
-            s.getCategory(),
-            extractDescription(s.getData()),
-            s.getSlug(),
-            s.getViewCount(),
-            s.getCreatedAt()))
+        .map(s -> {
+          var schema = toSchema(s);
+          return new ShopSummary(
+              s.getId(),
+              s.getShopName(),
+              s.getCategory(),
+              schema.description(),
+              schema.tagline(),
+              schema.theme(),
+              schema.coverImage(),
+              schema.products().size(),
+              s.getSlug(),
+              s.getViewCount(),
+              s.getCreatedAt());
+        })
         .toList();
   }
 
   @Transactional
   public void delete(UUID shopId, User owner) {
-    var shop = findOwned(shopId, owner);
-    repo.delete(shop);
+    repo.delete(requireOwned(shopId, owner));
   }
 
-  private Shop findOwned(UUID shopId, User owner) {
+  public Shop requireOwned(UUID shopId, User owner) {
     var shop = repo.findById(shopId).orElseThrow(() -> new NotFoundException("Shop not found"));
     if (shop.getOwner() == null || !shop.getOwner().getId().equals(owner.getId())) {
-      throw new BadRequestException("You do not own this shop");
+      throw new ForbiddenException("You do not own this shop");
     }
     return shop;
+  }
+
+  private ShopResponse save(Shop shop, ShopSchema schema, String changeSummary) {
+    shop.setShopName(schema.shopName());
+    shop.setCategory(schema.category());
+    shop.setData(toJsonb(schema));
+    if (shop.getSlug() == null) {
+      shop.setSlug(generateUniqueSlug(schema.shopName()));
+    }
+    return toResponse(repo.save(shop), schema, changeSummary);
+  }
+
+  /** A draft has no shop yet, so it cannot own uploaded photos. */
+  private static ShopSchema withoutImages(ShopSchema s) {
+    var products = s.products().stream()
+        .map(p -> new ShopSchema.Product(p.name(), p.price(), p.description(), p.category(), p.emoji(), "", p.suggested()))
+        .toList();
+    return new ShopSchema(s.shopName(), s.tagline(), s.description(), s.category(), s.address(), s.phone(),
+        s.whatsapp(), s.email(), s.timing(), s.instagram(), s.theme(), "", products);
   }
 
   private String generateUniqueSlug(String shopName) {
     String base = slugify(shopName);
     if (base.isBlank()) base = "shop";
+    if (base.length() > 60) base = base.substring(0, 60).replaceAll("-+$", "");
     String candidate = base;
     int suffix = 2;
     while (repo.existsBySlug(candidate)) {
@@ -152,7 +153,7 @@ public class ShopService {
     return candidate;
   }
 
-  private static String slugify(String input) {
+  static String slugify(String input) {
     if (input == null) return "";
     String normalized = Normalizer.normalize(input, Normalizer.Form.NFD)
         .replaceAll("\\p{InCombiningDiacriticalMarks}+", "");
@@ -160,67 +161,28 @@ public class ShopService {
         .replaceAll("^-+|-+$", "");
   }
 
-  private String extractDescription(String jsonb) {
+  private ShopSchema toSchema(Shop shop) {
+    var shopName = shop.getShopName() == null ? "My Shop" : shop.getShopName();
     try {
-      var node = objectMapper.readTree(jsonb);
-      var d = node.get("description");
-      return d != null && d.isTextual() ? d.asText() : "";
+      JsonNode node = objectMapper.readTree(shop.getData());
+      if (node == null || !node.isObject()) return ShopSanitizer.empty(shopName);
+      ((ObjectNode) node).put("shopName", shopName);
+      return ShopSanitizer.clean(objectMapper.treeToValue(node, ShopSchema.class));
     } catch (Exception e) {
-      return "";
+      return ShopSanitizer.empty(shopName);
     }
   }
 
-  private ShopSchema toSchema(String shopName, String jsonb) {
+  private String toJsonb(ShopSchema schema) {
     try {
-      JsonNode node = objectMapper.readTree(jsonb);
-      if (node == null || !node.isObject()) node = objectMapper.createObjectNode();
-      ObjectNode root = (ObjectNode) node;
-      root.put("shopName", shopName == null ? "My Shop" : shopName);
-      return objectMapper.treeToValue(root, ShopSchema.class);
-    } catch (Exception e) {
-      return new ShopSchema(shopName == null ? "My Shop" : shopName, "", "", "", "", "", "", "", "", "", "", List.of());
-    }
-  }
-
-  private String schemaToJsonb(ShopSchema schema) {
-    try {
-      ObjectNode jsonb = objectMapper.createObjectNode();
-      jsonb.put("description", nullToEmpty(schema.description()));
-      jsonb.put("category", nullToEmpty(schema.category()));
-      jsonb.put("address", nullToEmpty(schema.address()));
-      jsonb.put("phone", nullToEmpty(schema.phone()));
-      jsonb.put("whatsapp", nullToEmpty(schema.whatsapp()));
-      jsonb.put("email", nullToEmpty(schema.email()));
-      jsonb.put("timing", nullToEmpty(schema.timing()));
-      jsonb.put("instagram", nullToEmpty(schema.instagram()));
-      jsonb.put("theme", nullToEmpty(schema.theme()));
-      ArrayNode prods = objectMapper.createArrayNode();
-      if (schema.products() != null) {
-        for (var p : schema.products()) {
-          ObjectNode obj = objectMapper.createObjectNode();
-          obj.put("name", nullToEmpty(p.name()));
-          obj.put("price", nullToEmpty(p.price()));
-          obj.put("description", nullToEmpty(p.description()));
-          obj.put("category", nullToEmpty(p.category()));
-          prods.add(obj);
-        }
-      }
-      jsonb.set("products", prods);
-      return objectMapper.writeValueAsString(jsonb);
+      return objectMapper.writeValueAsString(schema);
     } catch (Exception e) {
       throw new BadRequestException("Failed to serialize shop data");
     }
   }
 
-  private ShopResponse toResponse(Shop shop, ShopSchema schema) {
-    return new ShopResponse(shop.getId(), schema, shop.getSlug(), shop.getViewCount(), shop.getCreatedAt());
-  }
-
-  private static String orDefault(String value, String fallback) {
-    return (value != null) ? value : (fallback != null ? fallback : "");
-  }
-
-  private static String nullToEmpty(String s) {
-    return s != null ? s : "";
+  private ShopResponse toResponse(Shop shop, ShopSchema schema, String changeSummary) {
+    return new ShopResponse(shop.getId(), schema, shop.getSlug(), shop.getViewCount(), shop.getCreatedAt(),
+        changeSummary);
   }
 }

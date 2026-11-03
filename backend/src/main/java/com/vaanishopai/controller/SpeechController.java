@@ -27,27 +27,19 @@ public class SpeechController {
       @RequestParam(value = "language", required = false) String language,
       HttpServletRequest request) {
 
-    String clientIp = resolveClientIp(request);
-    if (!rateLimitService.allowSpeech(clientIp)) {
-      throw new BadRequestException("Too many requests. Please wait a moment before trying again.");
-    }
+    // remoteAddr already reflects the real client when FORWARD_HEADERS_STRATEGY is set behind a proxy;
+    // reading X-Forwarded-For directly would let anyone dodge the limit by sending a fake header.
+    rateLimitService.checkSpeech(request.getRemoteAddr());
     if (audio == null || audio.isEmpty()) throw new BadRequestException("audio is required");
     if (audio.getSize() > 25 * 1024 * 1024) throw new BadRequestException("audio too large (max 25MB)");
     try {
-      String text = speechService.transcribeWebmOpus(audio.getBytes(), language);
+      var lang = language != null && language.matches("[a-z]{2}") ? language : null;
+      String text = speechService.transcribeWebmOpus(audio.getBytes(), lang);
       return new SpeechTranscribeResponse(text);
     } catch (BadRequestException e) {
       throw e;
     } catch (Exception e) {
       throw new BadRequestException("Failed to read audio");
     }
-  }
-
-  private String resolveClientIp(HttpServletRequest request) {
-    String forwarded = request.getHeader("X-Forwarded-For");
-    if (forwarded != null && !forwarded.isBlank()) {
-      return forwarded.split(",")[0].trim();
-    }
-    return request.getRemoteAddr();
   }
 }
